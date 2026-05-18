@@ -1,17 +1,21 @@
 newmtl floor
-Kd 0.36 0.34 0.3
+Kd 0.43 0.27 0.16
+Ke 0 0 0
+
+newmtl floor_sheen
+Kd 0.62 0.5 0.38
 Ke 0 0 0
 
 newmtl wall
-Kd 0.62 0.56 0.43
+Kd 0.55 0.36 0.24
 Ke 0 0 0
 
 newmtl dark_wall
-Kd 0.1 0.085 0.06
+Kd 0.2 0.12 0.075
 Ke 0 0 0
 
 newmtl trim
-Kd 0.78 0.7 0.56
+Kd 0.78 0.68 0.52
 Ke 0 0 0
 
 newmtl curtain
@@ -23,27 +27,27 @@ Kd 0.16 0.025 0.025
 Ke 0 0 0
 
 newmtl rug
-Kd 0.34 0.055 0.045
+Kd 0.26 0.14 0.075
 Ke 0 0 0
 
 newmtl rug_border
-Kd 0.78 0.58 0.24
+Kd 0.7 0.5 0.28
 Ke 0 0 0
 
 newmtl table
-Kd 0.42 0.2 0.08
+Kd 0.32 0.16 0.065
 Ke 0 0 0
 
 newmtl table_dark
-Kd 0.08 0.045 0.025
+Kd 0.075 0.042 0.024
 Ke 0 0 0
 
 newmtl wood_light
-Kd 0.72 0.36 0.13
+Kd 0.63 0.33 0.15
 Ke 0 0 0
 
 newmtl wood_glow
-Kd 0.96 0.55 0.18
+Kd 0.82 0.52 0.27
 Ke 0 0 0
 
 newmtl frame
@@ -134,7 +138,43 @@ newmtl matte_black
 Kd 0.02 0.02 0.025
 Ke 0 0 0
 
+newmtl plaster_light
+Kd 0.72 0.58 0.43
+Ke 0 0 0
+
+newmtl plaster_raw
+Kd 0.36 0.2 0.12
+Ke 0 0 0
+
+newmtl plaster_shadow
+Kd 0.16 0.095 0.06
+Ke 0 0 0
+
+newmtl old_wood
+Kd 0.34 0.16 0.06
+Ke 0 0 0
+
+newmtl old_wood_dark
+Kd 0.12 0.06 0.03
+Ke 0 0 0
+
+newmtl old_wood_light
+Kd 0.6 0.3 0.11
+Ke 0 0 0
+
+newmtl dust
+Kd 0.18 0.14 0.1
+Ke 0 0 0
+
+newmtl shadow_hole
+Kd 0.018 0.014 0.011
+Ke 0 0 0
+
 newmtl light_panel
 Kd 1 1 1
-Ke 22 18 13.5
+Ke 18 14 10
+
+newmtl light_fill
+Kd 1 1 1
+Ke 10 8 6
 

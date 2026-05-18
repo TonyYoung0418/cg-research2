@@ -124,14 +124,87 @@ struct Material {
     bool sampleLight = false;
 };
 
+struct Texture {
+    int width = 0;
+    int height = 0;
+    std::vector<Vec3> pixels;
+};
+
+bool hasTexture(const Texture &tex) {
+    return tex.width > 0 && tex.height > 0 && !tex.pixels.empty();
+}
+
+double srgbToLinear(double v) {
+    v = std::clamp(v, 0.0, 1.0);
+    return std::pow(v, 2.2);
+}
+
+Texture loadPpmTexture(const std::string &path) {
+    Texture tex;
+    std::ifstream in(path, std::ios::binary);
+    if (!in) return tex;
+
+    std::string magic;
+    int maxValue = 0;
+    in >> magic >> tex.width >> tex.height >> maxValue;
+    if (magic != "P6" || tex.width <= 0 || tex.height <= 0 || maxValue != 255) return tex;
+    in.get();
+
+    tex.pixels.resize(size_t(tex.width) * tex.height);
+    for (int i = 0; i < tex.width * tex.height; ++i) {
+        unsigned char rgb[3];
+        in.read(reinterpret_cast<char *>(rgb), 3);
+        if (!in) {
+            tex.pixels.clear();
+            tex.width = tex.height = 0;
+            return tex;
+        }
+        tex.pixels[size_t(i)] = {
+            srgbToLinear(rgb[0] / 255.0),
+            srgbToLinear(rgb[1] / 255.0),
+            srgbToLinear(rgb[2] / 255.0)
+        };
+    }
+    return tex;
+}
+
+int wrapIndex(int value, int size) {
+    value %= size;
+    if (value < 0) value += size;
+    return value;
+}
+
+Vec3 sampleTextureRepeat(const Texture &tex, double u, double v) {
+    if (!hasTexture(tex)) return {1, 1, 1};
+    u -= std::floor(u);
+    v -= std::floor(v);
+    double x = u * tex.width - 0.5;
+    double y = (1.0 - v) * tex.height - 0.5;
+    int x0 = int(std::floor(x));
+    int y0 = int(std::floor(y));
+    double tx = x - x0;
+    double ty = y - y0;
+    int x1 = x0 + 1;
+    int y1 = y0 + 1;
+    const Vec3 &c00 = tex.pixels[size_t(wrapIndex(y0, tex.height)) * tex.width + size_t(wrapIndex(x0, tex.width))];
+    const Vec3 &c10 = tex.pixels[size_t(wrapIndex(y0, tex.height)) * tex.width + size_t(wrapIndex(x1, tex.width))];
+    const Vec3 &c01 = tex.pixels[size_t(wrapIndex(y1, tex.height)) * tex.width + size_t(wrapIndex(x0, tex.width))];
+    const Vec3 &c11 = tex.pixels[size_t(wrapIndex(y1, tex.height)) * tex.width + size_t(wrapIndex(x1, tex.width))];
+    Vec3 a = (1.0 - tx) * c00 + tx * c10;
+    Vec3 b = (1.0 - tx) * c01 + tx * c11;
+    return (1.0 - ty) * a + ty * b;
+}
+
 struct Triangle {
     Vec3 v0, v1, v2;
+    Vec3 n0, n1, n2;
     Vec3 normal;
     Vec3 centroid;
     Vec3 bmin, bmax;
     double area = 0.0;
     int material = 0;
     int visibility = kVisibleToAll;
+    bool hasVertexNormals = false;
     std::string object;
 };
 
@@ -179,20 +252,20 @@ struct Options {
     int maxDepth = 8;
     int threads = std::max(1u, std::thread::hardware_concurrency());
     bool shadows = true;
-    bool extraLight = false;
+    bool extraLight = true;
     std::string output = "renders/view_main.ppm";
     std::string objPath = "scenes/generated_scene.obj";
     std::string mtlPath = "scenes/generated_scene.mtl";
     std::string preset = "main";
     std::string environment = "studio";
-    Vec3 camera{0.0, 1.42, 4.65};
-    Vec3 lookAt{0.0, 1.42, -2.80};
-    Vec3 lightPos{-1.65, 2.82, 3.35};
+    Vec3 camera{-0.25, 0.96, 5.90};
+    Vec3 lookAt{-0.05, 0.50, 2.35};
+    Vec3 lightPos{0.00, 3.45, 1.80};
     Vec3 objectOffset{0.0, 0.0, 0.0};
-    Vec3 floorColor{0.36, 0.34, 0.30};
+    Vec3 floorColor{0.43, 0.27, 0.16};
     double objectRotateY = 0.0;
-    double fov = 48.0;
-    double lightSize = 0.45;
+    double fov = 52.0;
+    double lightSize = 2.20;
     double metalRoughness = 0.12;
 };
 
@@ -202,17 +275,17 @@ double parseDouble(const char *s) {
 
 void applyPreset(Options &opt) {
     if (opt.preset == "side") {
-        opt.camera = {-2.15, 1.30, 4.15};
-        opt.lookAt = {-0.10, 1.18, 1.55};
-        opt.fov = 50.0;
+        opt.camera = {-2.85, 0.90, 5.35};
+        opt.lookAt = {-0.12, 0.48, 2.45};
+        opt.fov = 52.0;
     } else if (opt.preset == "wide") {
-        opt.camera = {0.0, 1.42, 5.10};
-        opt.lookAt = {0.0, 1.16, 1.55};
-        opt.fov = 58.0;
+        opt.camera = {-0.10, 1.06, 6.45};
+        opt.lookAt = {-0.05, 0.48, 2.20};
+        opt.fov = 60.0;
     } else {
-        opt.camera = {0.0, 1.45, 5.00};
-        opt.lookAt = {0.0, 1.18, 1.55};
-        opt.fov = 54.0;
+        opt.camera = {-0.25, 0.96, 5.90};
+        opt.lookAt = {-0.05, 0.50, 2.35};
+        opt.fov = 56.0;
     }
 }
 
@@ -286,18 +359,19 @@ std::vector<Material> makeMaterials(const Options &opt, std::map<std::string, in
         ids[mat.name] = int(m.size());
         m.push_back(mat);
     };
-    add({"floor", opt.floorColor, {0, 0, 0}, 0, 1.5, 0, false});
-    add({"wall", {0.62, 0.56, 0.43}, {0, 0, 0}, 0, 1.5, 0, false});
-    add({"dark_wall", {0.10, 0.085, 0.060}, {0, 0, 0}, 0, 1.5, 0, false});
-    add({"trim", {0.78, 0.70, 0.56}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"floor", opt.floorColor, {0, 0, 0}, 0.0, 1.5, 0, false});
+    add({"floor_sheen", {0.62, 0.50, 0.38}, {0, 0, 0}, 0.42, 1.5, 1, false});
+    add({"wall", {0.55, 0.36, 0.24}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"dark_wall", {0.20, 0.12, 0.075}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"trim", {0.78, 0.68, 0.52}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"curtain", {0.36, 0.045, 0.040}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"curtain_dark", {0.16, 0.025, 0.025}, {0, 0, 0}, 0, 1.5, 0, false});
-    add({"rug", {0.34, 0.055, 0.045}, {0, 0, 0}, 0, 1.5, 0, false});
-    add({"rug_border", {0.78, 0.58, 0.24}, {0, 0, 0}, 0.1, 1.5, 1, false});
-    add({"table", {0.42, 0.20, 0.08}, {0, 0, 0}, 0, 1.5, 0, false});
-    add({"table_dark", {0.08, 0.045, 0.025}, {0, 0, 0}, 0, 1.5, 0, false});
-    add({"wood_light", {0.72, 0.36, 0.13}, {0, 0, 0}, 0, 1.5, 0, false});
-    add({"wood_glow", {0.96, 0.55, 0.18}, {0, 0, 0}, 0.08, 1.5, 1, false});
+    add({"rug", {0.26, 0.14, 0.075}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"rug_border", {0.70, 0.50, 0.28}, {0, 0, 0}, 0.1, 1.5, 1, false});
+    add({"table", {0.32, 0.16, 0.065}, {0, 0, 0}, 0.04, 1.5, 0, false});
+    add({"table_dark", {0.075, 0.042, 0.024}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"wood_light", {0.63, 0.33, 0.15}, {0, 0, 0}, 0.02, 1.5, 0, false});
+    add({"wood_glow", {0.82, 0.52, 0.27}, {0, 0, 0}, 0.08, 1.5, 1, false});
     add({"frame", {0.90, 0.62, 0.24}, {0, 0, 0}, 0.0, 1.5, 0, false});
     add({"brass", {0.80, 0.57, 0.22}, {0, 0, 0}, 0.12, 1.5, 1, false});
     add({"ceramic", {0.82, 0.76, 0.64}, {0, 0, 0}, 0, 1.5, 0, false});
@@ -317,18 +391,45 @@ std::vector<Material> makeMaterials(const Options &opt, std::map<std::string, in
     add({"painting_green", {0.16, 0.46, 0.40}, {0.035, 0.08, 0.06}, 0, 1.5, 0, false});
     add({"painting_orange", {0.78, 0.34, 0.12}, {0.12, 0.045, 0.015}, 0, 1.5, 0, false});
     add({"painting_red", {0.52, 0.08, 0.06}, {0.08, 0.012, 0.008}, 0, 1.5, 0, false});
-    add({"white_piece", {0.86, 0.82, 0.70}, {0, 0, 0}, 0.08, 1.5, 1, false});
-    add({"black_piece", {0.035, 0.030, 0.026}, {0, 0, 0}, 0.05, 1.5, 1, false});
+    add({"white_piece", {0.78, 0.75, 0.66}, {0, 0, 0}, 0.0, 1.5, 0, false});
+    add({"black_piece", {0.035, 0.030, 0.026}, {0, 0, 0}, 0.0, 1.5, 0, false});
     add({"matte_black", {0.02, 0.02, 0.025}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"plaster_light", {0.72, 0.58, 0.43}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"plaster_raw", {0.36, 0.20, 0.12}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"plaster_shadow", {0.16, 0.095, 0.060}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"old_wood", {0.34, 0.16, 0.060}, {0, 0, 0}, 0.08, 1.5, 0, false});
+    add({"old_wood_dark", {0.12, 0.060, 0.030}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"old_wood_light", {0.60, 0.30, 0.11}, {0, 0, 0}, 0.04, 1.5, 0, false});
+    add({"dust", {0.18, 0.14, 0.10}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"shadow_hole", {0.018, 0.014, 0.011}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"metal", {0.78, 0.78, 0.74}, {0, 0, 0}, opt.metalRoughness, 1.5, 1, false});
     add({"glass", {0.94, 0.98, 1.0}, {0, 0, 0}, 0.01, 1.52, 2, false});
-    add({"light_panel", {1, 1, 1}, {22.0, 18.0, 13.5}, 0, 1.5, 3, true});
+    add({"light_panel", {1, 1, 1}, {18.0, 14.0, 10.0}, 0, 1.5, 3, true});
+    add({"light_fill", {1, 1, 1}, {10.0, 8.0, 6.0}, 0, 1.5, 3, true});
     return m;
 }
 
-int parseFaceIndex(const std::string &tok) {
+struct FaceVertex {
+    int v = 0;
+    int vn = 0;
+};
+
+FaceVertex parseFaceVertex(const std::string &tok) {
+    FaceVertex out;
     size_t slash = tok.find('/');
-    return std::stoi(slash == std::string::npos ? tok : tok.substr(0, slash));
+    if (slash == std::string::npos) {
+        out.v = std::stoi(tok);
+        return out;
+    }
+    out.v = std::stoi(tok.substr(0, slash));
+    size_t slash2 = tok.find('/', slash + 1);
+    if (slash2 == std::string::npos) {
+        return out;
+    }
+    if (slash2 + 1 < tok.size()) {
+        out.vn = std::stoi(tok.substr(slash2 + 1));
+    }
+    return out;
 }
 
 void finalizeTriangle(Triangle &t) {
@@ -367,6 +468,7 @@ std::vector<Triangle> loadObj(const Options &opt, const std::map<std::string, in
         std::exit(1);
     }
     std::vector<Vec3> verts(1);
+    std::vector<Vec3> norms(1);
     std::vector<Triangle> tris;
     std::string currentMat = "wall";
     std::string currentObj = "Object";
@@ -379,19 +481,31 @@ std::vector<Triangle> loadObj(const Options &opt, const std::map<std::string, in
             Vec3 p;
             ss >> p.x >> p.y >> p.z;
             verts.push_back(p);
+        } else if (tag == "vn") {
+            Vec3 n;
+            ss >> n.x >> n.y >> n.z;
+            norms.push_back(n);
         } else if (tag == "usemtl") {
             ss >> currentMat;
         } else if (tag == "o") {
             ss >> currentObj;
         } else if (tag == "f") {
-            std::vector<int> ids;
+            std::vector<FaceVertex> ids;
             std::string tok;
-            while (ss >> tok) ids.push_back(parseFaceIndex(tok));
+            while (ss >> tok) ids.push_back(parseFaceVertex(tok));
             for (size_t i = 1; i + 1 < ids.size(); ++i) {
                 Triangle t;
-                t.v0 = verts[ids[0]];
-                t.v1 = verts[ids[i]];
-                t.v2 = verts[ids[i + 1]];
+                t.v0 = verts[ids[0].v];
+                t.v1 = verts[ids[i].v];
+                t.v2 = verts[ids[i + 1].v];
+                if (ids[0].vn > 0 && ids[0].vn < int(norms.size()) &&
+                    ids[i].vn > 0 && ids[i].vn < int(norms.size()) &&
+                    ids[i + 1].vn > 0 && ids[i + 1].vn < int(norms.size())) {
+                    t.n0 = normalize(norms[ids[0].vn]);
+                    t.n1 = normalize(norms[ids[i].vn]);
+                    t.n2 = normalize(norms[ids[i + 1].vn]);
+                    t.hasVertexNormals = true;
+                }
                 t.object = currentObj;
                 t.visibility = objectVisibility(currentObj);
                 auto it = matIds.find(currentMat);
@@ -412,6 +526,11 @@ std::vector<Triangle> loadObj(const Options &opt, const std::map<std::string, in
             t.v0 = rotateY(t.v0, transformCenter, radians) + opt.objectOffset;
             t.v1 = rotateY(t.v1, transformCenter, radians) + opt.objectOffset;
             t.v2 = rotateY(t.v2, transformCenter, radians) + opt.objectOffset;
+            if (t.hasVertexNormals) {
+                t.n0 = normalize(rotateY(t.n0, Vec3{0.0, 0.0, 0.0}, radians));
+                t.n1 = normalize(rotateY(t.n1, Vec3{0.0, 0.0, 0.0}, radians));
+                t.n2 = normalize(rotateY(t.n2, Vec3{0.0, 0.0, 0.0}, radians));
+            }
             finalizeTriangle(t);
         }
     }
@@ -421,6 +540,7 @@ std::vector<Triangle> loadObj(const Options &opt, const std::map<std::string, in
 struct Scene {
     Options opt;
     std::vector<Material> materials;
+    Texture floorTexture;
     std::vector<Triangle> triangles;
     std::vector<int> prims;
     std::vector<BvhNode> nodes;
@@ -429,6 +549,10 @@ struct Scene {
     explicit Scene(Options options) : opt(std::move(options)) {
         std::map<std::string, int> matIds;
         materials = makeMaterials(opt, matIds);
+        floorTexture = loadPpmTexture("textures/old_wood_floor.ppm");
+        if (!hasTexture(floorTexture)) {
+            std::cerr << "Warning: could not load textures/old_wood_floor.ppm, using flat floor color\n";
+        }
         scene_builder::BuildOptions buildOpt;
         buildOpt.objPath = opt.objPath;
         buildOpt.mtlPath = opt.mtlPath;
@@ -449,6 +573,16 @@ struct Scene {
         prims.resize(triangles.size());
         for (int i = 0; i < int(prims.size()); ++i) prims[i] = i;
         buildBvh();
+    }
+
+    Vec3 surfaceAlbedo(const Hit &hit, const Material &mat) const {
+        if (hasTexture(floorTexture) && mat.name == "floor" && std::abs(hit.normal.y) > 0.9) {
+            double u = hit.p.x * 0.18 + 0.11;
+            double v = hit.p.z * 0.18 + 0.27;
+            Vec3 tex = sampleTextureRepeat(floorTexture, u, v);
+            return {tex.x * 0.98, tex.y * 0.96, tex.z * 0.92};
+        }
+        return mat.albedo;
     }
 
     int buildNode(int start, int end) {
@@ -504,8 +638,11 @@ struct Scene {
         if (t < tMin || t > tMax) return false;
         hit.t = t;
         hit.p = r.at(t);
+        double w = 1.0 - u - v;
+        Vec3 shadingNormal = tri.hasVertexNormals ? normalize(w * tri.n0 + u * tri.n1 + v * tri.n2) : tri.normal;
+        if (dot(shadingNormal, tri.normal) < 0.0) shadingNormal = -shadingNormal;
         hit.frontFace = dot(r.direction, tri.normal) < 0.0;
-        hit.normal = hit.frontFace ? tri.normal : -tri.normal;
+        hit.normal = hit.frontFace ? shadingNormal : -shadingNormal;
         hit.material = tri.material;
         return true;
     }
@@ -573,7 +710,7 @@ struct Scene {
     Vec3 sampleDirect(const Hit &hit, const Material &mat, int visibility, Rng &rng) const {
         if (lightTris.empty() || mat.type == 2 || mat.type == 3) return {0, 0, 0};
         Vec3 result{0, 0, 0};
-        Vec3 brdf = mat.albedo / kPi;
+        Vec3 brdf = surfaceAlbedo(hit, mat) / kPi;
         for (int idx : lightTris) {
             const Triangle &lt = triangles[idx];
             double r1 = rng.next();
@@ -605,7 +742,7 @@ struct Scene {
         if (mat.type == 0) {
             Vec3 dir = cosineHemisphere(hit.normal, rng);
             scattered = {hit.p + 1e-4 * hit.normal, dir, ray.visibility};
-            atten = mat.albedo;
+            atten = surfaceAlbedo(hit, mat);
             return true;
         }
         if (mat.type == 1) {

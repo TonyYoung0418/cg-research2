@@ -12,9 +12,34 @@ queen visible in the room is replaced by a king in the mirror, and the left-side
 knight is replaced by a bishop. This is implemented with camera-only and
 reflection-only mesh visibility rather than a post-process image trick.
 
-The room background is procedurally modeled after the reference final scene:
-warm wood planks, a beige wall with a horizontal floral painting, and a dark
-black-framed window with warm interior highlights.
+The room background is procedurally modeled after an online abandoned-house
+reference: rough plaster, old wood boards, a worn door, fireplace damage,
+cracks, dust, and loose debris. It is built from geometry and materials rather
+than using the reference photo as an image background; the window elements from
+the reference are intentionally omitted.
+
+The floor uses a CC0 old wood floor diffuse texture from Poly Haven, converted
+to a local PPM file and sampled by the renderer as a repeating material map.
+
+## External Assets And Citations
+
+The core renderer, scene construction code, camera controls, material handling,
+shadow rays, mirror visibility logic, texture sampling, and Monte Carlo path
+tracing are implemented in this C++ project. External assets are used only as
+scene inputs and are cited here for report traceability:
+
+- Motivational image: Shruti Agarwal's Dartmouth College 2018 Rendering
+  Competition entry for the theme "Something seems a little off".
+- Chess meshes: TurboSquid "Free Stuff 1 - Chess Set" OBJ assets, imported as
+  mesh geometry and assigned materials by the local scene builder.
+- Floor texture: Poly Haven "Old Wood Floor" diffuse texture
+  (`https://polyhaven.com/a/old_wood_floor`), CC0, converted to
+  `textures/old_wood_floor.ppm` and sampled by the renderer as a repeating
+  texture map.
+
+No off-the-shelf renderer such as Blender, Unity, Unreal, or Cycles is used for
+the final rendering. The renderer loads the generated OBJ scene and performs the
+image synthesis itself.
 
 ## Build
 
@@ -26,7 +51,7 @@ cmake --build build
 ## Render the required two viewpoints
 
 ```bash
-./build/MirrorReflectionRenderer --preset main --width 800 --height 600 --spp 64 --output renders/view_main.ppm
+./build/MirrorReflectionRenderer --preset main --width 1024 --height 768 --spp 160 --output renders/view_main.ppm
 ./build/MirrorReflectionRenderer --preset side --width 800 --height 600 --spp 64 --output renders/view_side.ppm
 ```
 
@@ -50,7 +75,7 @@ on every run, then renders from the loaded OBJ geometry.
 
 ## Prepared files
 
-- `renders/view_main.png` and `renders/view_side.png`: generated 800x600 result
-  images from two viewpoints.
+- `renders/view_main.png`: generated 1024x768 main result image.
+- `renders/view_side.png`: generated 800x600 side-view result image.
 - `Free_Stuff_1_-__Chess_Set/OBJ/`: the subset of the downloaded chess OBJ
   assets used by the scene builder.

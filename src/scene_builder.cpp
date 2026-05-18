@@ -29,6 +29,11 @@ public:
         return nextIndex++;
     }
 
+    int normal(const Vec3 &n) {
+        obj << "vn " << n.x << " " << n.y << " " << n.z << "\n";
+        return nextNormalIndex++;
+    }
+
     void tri(const std::string &object, const std::string &mat, const Vec3 &a, const Vec3 &b, const Vec3 &c) {
         obj << "o " << object << "\nusemtl " << mat << "\n";
         int ia = vertex(a), ib = vertex(b), ic = vertex(c);
@@ -86,6 +91,21 @@ public:
         }
     }
 
+    void disk(const std::string &object, const std::string &mat, Vec3 center,
+              double rx, double ry, double z, int segments) {
+        obj << "o " << object << "\nusemtl " << mat << "\n";
+        int mid = vertex({center.x, center.y, z});
+        std::vector<int> ring(segments);
+        for (int i = 0; i < segments; ++i) {
+            double a = 2.0 * kPi * i / segments;
+            ring[i] = vertex({center.x + rx * std::cos(a), center.y + ry * std::sin(a), z});
+        }
+        for (int i = 0; i < segments; ++i) {
+            int j = (i + 1) % segments;
+            obj << "f " << mid << " " << ring[i] << " " << ring[j] << "\n";
+        }
+    }
+
     void model(const std::string &path, const std::string &object, const std::string &mat,
                Vec3 translate, double scale, double rotateYRadians = 0.0) {
         std::ifstream in(path);
@@ -95,11 +115,20 @@ public:
         }
 
         std::vector<Vec3> verts(1);
+        std::vector<Vec3> norms(1);
         std::vector<std::vector<int>> faces;
+        std::vector<std::vector<int>> faceNormals;
         std::string line;
         auto faceIndex = [](const std::string &tok) {
             size_t slash = tok.find('/');
             return std::stoi(slash == std::string::npos ? tok : tok.substr(0, slash));
+        };
+        auto normalIndex = [](const std::string &tok) {
+            size_t slash = tok.find('/');
+            if (slash == std::string::npos) return 0;
+            size_t slash2 = tok.find('/', slash + 1);
+            if (slash2 == std::string::npos || slash2 + 1 >= tok.size()) return 0;
+            return std::stoi(tok.substr(slash2 + 1));
         };
         auto transform = [&](Vec3 p) {
             double c = std::cos(rotateYRadians), s = std::sin(rotateYRadians);
@@ -116,19 +145,53 @@ public:
                 Vec3 p;
                 ss >> p.x >> p.y >> p.z;
                 verts.push_back(p);
+            } else if (tag == "vn") {
+                Vec3 n;
+                ss >> n.x >> n.y >> n.z;
+                norms.push_back(n);
             } else if (tag == "f") {
                 std::vector<int> ids;
+                std::vector<int> nids;
                 std::string tok;
-                while (ss >> tok) ids.push_back(faceIndex(tok));
+                while (ss >> tok) {
+                    ids.push_back(faceIndex(tok));
+                    nids.push_back(normalIndex(tok));
+                }
                 faces.push_back(ids);
+                faceNormals.push_back(nids);
             }
         }
 
         std::vector<int> remap(verts.size());
+        std::vector<int> normalRemap(norms.size());
         for (size_t i = 1; i < verts.size(); ++i) remap[i] = vertex(transform(verts[i]));
-        for (const auto &ids : faces) {
+        for (size_t i = 1; i < norms.size(); ++i) {
+            Vec3 n = norms[i];
+            double c = std::cos(rotateYRadians), s = std::sin(rotateYRadians);
+            Vec3 r{c * n.x + s * n.z, n.y, -s * n.x + c * n.z};
+            double len = std::sqrt(r.x * r.x + r.y * r.y + r.z * r.z);
+            if (len > 0.0) {
+                r.x /= len;
+                r.y /= len;
+                r.z /= len;
+            }
+            normalRemap[i] = normal(r);
+        }
+        for (size_t f = 0; f < faces.size(); ++f) {
+            const auto &ids = faces[f];
+            const auto &nids = faceNormals[f];
             for (size_t i = 1; i + 1 < ids.size(); ++i) {
-                obj << "f " << remap[ids[0]] << " " << remap[ids[i]] << " " << remap[ids[i + 1]] << "\n";
+                int a = remap[ids[0]];
+                int b = remap[ids[i]];
+                int c = remap[ids[i + 1]];
+                int na = (nids.size() > 0 && nids[0] > 0 && nids[0] < int(normalRemap.size())) ? normalRemap[nids[0]] : 0;
+                int nb = (nids.size() > i && nids[i] > 0 && nids[i] < int(normalRemap.size())) ? normalRemap[nids[i]] : 0;
+                int nc = (nids.size() > i + 1 && nids[i + 1] > 0 && nids[i + 1] < int(normalRemap.size())) ? normalRemap[nids[i + 1]] : 0;
+                if (na > 0 && nb > 0 && nc > 0) {
+                    obj << "f " << a << "//" << na << " " << b << "//" << nb << " " << c << "//" << nc << "\n";
+                } else {
+                    obj << "f " << a << " " << b << " " << c << "\n";
+                }
             }
         }
     }
@@ -137,6 +200,7 @@ public:
 
 private:
     int nextIndex = 1;
+    int nextNormalIndex = 1;
 };
 
 void writeMtl(const BuildOptions &opt) {
@@ -147,17 +211,18 @@ void writeMtl(const BuildOptions &opt) {
         mtl << "Ke " << ke.x << " " << ke.y << " " << ke.z << "\n\n";
     };
     mat("floor", {opt.floorColor[0], opt.floorColor[1], opt.floorColor[2]});
-    mat("wall", {0.62, 0.56, 0.43});
-    mat("dark_wall", {0.10, 0.085, 0.060});
-    mat("trim", {0.78, 0.70, 0.56});
+    mat("floor_sheen", {0.62, 0.50, 0.38});
+    mat("wall", {0.55, 0.36, 0.24});
+    mat("dark_wall", {0.20, 0.12, 0.075});
+    mat("trim", {0.78, 0.68, 0.52});
     mat("curtain", {0.36, 0.045, 0.040});
     mat("curtain_dark", {0.16, 0.025, 0.025});
-    mat("rug", {0.34, 0.055, 0.045});
-    mat("rug_border", {0.78, 0.58, 0.24});
-    mat("table", {0.42, 0.20, 0.08});
-    mat("table_dark", {0.08, 0.045, 0.025});
-    mat("wood_light", {0.72, 0.36, 0.13});
-    mat("wood_glow", {0.96, 0.55, 0.18});
+    mat("rug", {0.26, 0.14, 0.075});
+    mat("rug_border", {0.70, 0.50, 0.28});
+    mat("table", {0.32, 0.16, 0.065});
+    mat("table_dark", {0.075, 0.042, 0.024});
+    mat("wood_light", {0.63, 0.33, 0.15});
+    mat("wood_glow", {0.82, 0.52, 0.27});
     mat("frame", {0.90, 0.62, 0.24});
     mat("brass", {0.80, 0.57, 0.22});
     mat("ceramic", {0.82, 0.76, 0.64});
@@ -180,7 +245,16 @@ void writeMtl(const BuildOptions &opt) {
     mat("white_piece", {0.86, 0.82, 0.70});
     mat("black_piece", {0.035, 0.030, 0.026});
     mat("matte_black", {0.02, 0.02, 0.025});
-    mat("light_panel", {1, 1, 1}, {22.0, 18.0, 13.5});
+    mat("plaster_light", {0.72, 0.58, 0.43});
+    mat("plaster_raw", {0.36, 0.20, 0.12});
+    mat("plaster_shadow", {0.16, 0.095, 0.060});
+    mat("old_wood", {0.34, 0.16, 0.060});
+    mat("old_wood_dark", {0.12, 0.060, 0.030});
+    mat("old_wood_light", {0.60, 0.30, 0.11});
+    mat("dust", {0.18, 0.14, 0.10});
+    mat("shadow_hole", {0.018, 0.014, 0.011});
+    mat("light_panel", {1, 1, 1}, {18.0, 14.0, 10.0});
+    mat("light_fill", {1, 1, 1}, {10.0, 8.0, 6.0});
 }
 
 } // namespace
@@ -190,121 +264,100 @@ void writeSceneObj(const BuildOptions &opt) {
     ObjWriter w(opt.objPath);
     w.obj << "mtllib generated_scene.mtl\n";
 
-    w.quad("Floor", "floor", {-4.5, 0.0, -2.8}, {4.5, 0.0, -2.8}, {4.5, 0.0, 5.6}, {-4.5, 0.0, 5.6});
-    w.quad("BackWall", "wall", {4.5, 0.0, -2.8}, {-4.5, 0.0, -2.8}, {-4.5, 3.1, -2.8}, {4.5, 3.1, -2.8});
-    w.quad("LeftWall", "wall", {-4.5, 0.0, 5.6}, {-4.5, 0.0, -2.8}, {-4.5, 3.1, -2.8}, {-4.5, 3.1, 5.6});
-    w.quad("RightWall", "dark_wall", {4.5, 0.0, -2.8}, {4.5, 0.0, 5.6}, {4.5, 3.1, 5.6}, {4.5, 3.1, -2.8});
-    w.quad("Ceiling", "dark_wall", {-4.5, 3.1, 5.6}, {4.5, 3.1, 5.6}, {4.5, 3.1, -2.8}, {-4.5, 3.1, -2.8});
+    w.quad("Floor", "floor", {-5.8, 0.0, -3.35}, {5.8, 0.0, -3.35}, {5.8, 0.0, 7.2}, {-5.8, 0.0, 7.2});
+    w.quad("BackWall", "wall", {5.8, 0.0, -3.35}, {-5.8, 0.0, -3.35}, {-5.8, 3.5, -3.35}, {5.8, 3.5, -3.35});
+    w.quad("LeftWall", "dark_wall", {-5.8, 0.0, 7.2}, {-5.8, 0.0, -3.35}, {-5.8, 3.5, -3.35}, {-5.8, 3.5, 7.2});
+    w.quad("RightWall", "wall", {5.8, 0.0, -3.35}, {5.8, 0.0, 7.2}, {5.8, 3.5, 7.2}, {5.8, 3.5, -3.35});
+    w.quad("Ceiling", "plaster_light", {-5.8, 3.5, 7.2}, {5.8, 3.5, 7.2}, {5.8, 3.5, -3.35}, {-5.8, 3.5, -3.35});
 
-    w.box("TableTop", "table", {-4.2, 0.55, 0.10}, {4.2, 0.72, 5.35});
+    w.box("BackBaseboard", "trim", {-5.70, 0.02, -3.24}, {5.70, 0.16, -3.08});
+    w.box("RightBaseboard", "trim", {5.62, 0.02, -3.10}, {5.78, 0.16, 7.00});
+    w.box("LeftBaseboard", "old_wood_dark", {-5.78, 0.02, -3.10}, {-5.62, 0.16, 7.00});
+    w.box("BackCrownMoulding", "trim", {-5.70, 3.26, -3.24}, {5.70, 3.44, -3.08});
+
+    w.box("DoorFrameLeft", "old_wood_dark", {3.10, 0.00, -3.06}, {3.30, 2.88, -2.76});
+    w.box("DoorFrameRight", "old_wood_dark", {4.42, 0.00, -3.06}, {4.62, 2.88, -2.76});
+    w.box("DoorFrameTop", "old_wood_dark", {3.10, 2.70, -3.06}, {4.62, 2.88, -2.76});
+    w.box("OldDoorPanel", "old_wood", {3.32, 0.00, -3.00}, {4.40, 2.66, -2.82});
+    w.box("DoorInsetUpper", "old_wood_light", {3.50, 1.55, -2.80}, {4.22, 2.42, -2.70});
+    w.box("DoorInsetLower", "old_wood_light", {3.50, 0.32, -2.80}, {4.22, 1.20, -2.70});
+    w.box("DoorCenterRail", "old_wood_dark", {3.83, 0.06, -2.68}, {3.96, 2.56, -2.56});
+    w.disk("DoorKnob", "brass", {4.26, 1.28, -2.52}, 0.065, 0.065, -2.48, 16);
+
+    w.box("MantelTop", "old_wood_dark", {-4.95, 1.18, -3.06}, {-2.08, 1.36, -2.68});
+    w.box("MantelShelf", "old_wood", {-5.16, 1.34, -2.98}, {-1.86, 1.48, -2.56});
+    w.box("MantelLeftPost", "old_wood_dark", {-4.92, 0.00, -3.00}, {-4.64, 1.30, -2.62});
+    w.box("MantelRightPost", "old_wood_dark", {-2.38, 0.00, -3.00}, {-2.10, 1.30, -2.62});
+    w.box("FireplaceShadow", "shadow_hole", {-4.48, 0.00, -2.88}, {-2.58, 1.05, -2.62});
+    w.box("FireplaceRubbleBack", "plaster_shadow", {-4.36, 0.08, -2.58}, {-2.70, 0.98, -2.44});
     for (int i = 0; i < 8; ++i) {
-        double x = -4.2 + i * 1.2;
-        w.box("TablePlankGap", "table_dark", {x - 0.016, 0.721, 0.12}, {x + 0.016, 0.729, 5.32});
+        double x = -4.30 + 0.21 * i;
+        w.box("FireplaceBrick", "plaster_raw", {x, 0.12 + 0.10 * (i % 3), -2.44}, {x + 0.14, 0.17 + 0.10 * (i % 3), -2.30});
     }
-    for (int i = 0; i < 11; ++i) {
-        double z = 0.35 + i * 0.42;
-        w.quad("WoodLine", "table_dark", {-4.05, 0.731, z}, {4.05, 0.731, z + 0.012},
-               {4.05, 0.731, z + 0.020}, {-4.05, 0.731, z + 0.008});
+    w.disk("RoundWallHole", "shadow_hole", {-3.10, 1.82, -2.52}, 0.20, 0.17, -2.48, 24);
+
+    w.quad("CeilingStain", "plaster_shadow", {-3.50, 3.45, 4.40}, {1.35, 3.45, 4.05}, {2.45, 3.45, -0.90}, {-2.05, 3.45, -0.55});
+    w.quad("CeilingLightPatch", "plaster_light", {-0.80, 3.445, 3.05}, {4.65, 3.445, 2.82}, {4.70, 3.445, 0.12}, {0.10, 3.445, 0.42});
+    for (int i = 0; i < 20; ++i) {
+        double x = -4.80 + 0.52 * (i % 10);
+        double z = -2.80 + 0.34 * (i / 10) + 0.15 * (i % 3);
+        w.quad("CeilingTrowelMarks", "plaster_raw", {x, 3.435, z}, {x + 0.30, 3.435, z + 0.055},
+               {x + 0.32, 3.435, z + 0.080}, {x + 0.02, 3.435, z + 0.025});
     }
+
     for (int i = 0; i < 18; ++i) {
-        double z = 0.45 + i * 0.26;
-        double x0 = -4.08 + 0.10 * (i % 3);
-        w.quad("WoodGrainWarm", "wood_light", {x0, 0.738, z}, {4.05, 0.738, z + 0.018},
-               {4.05, 0.738, z + 0.035}, {x0, 0.738, z + 0.012});
+        double x = -5.20 + 0.58 * (i % 9);
+        double y = 0.62 + 0.22 * (i / 9) + 0.05 * (i % 4);
+        w.quad("BackWallScrape", (i % 3 == 0) ? "plaster_light" : "plaster_raw",
+               {x, y, -3.05}, {x + 0.36, y + 0.06, -3.05}, {x + 0.31, y + 0.12, -3.01}, {x - 0.04, y + 0.04, -3.01});
     }
-    w.quad("WoodHighlight", "wood_glow", {-3.9, 0.740, 2.40}, {3.9, 0.740, 2.52}, {3.9, 0.740, 2.64}, {-3.9, 0.740, 2.55});
-    w.quad("WoodHighlightRight", "wood_glow", {1.1, 0.741, 1.30}, {4.05, 0.741, 1.43}, {4.05, 0.741, 1.55}, {1.1, 0.741, 1.44});
-
-    w.box("BackBaseboard", "trim", {-4.45, 0.02, -2.68}, {4.45, 0.16, -2.55});
-    w.box("BackCrownMoulding", "trim", {-4.45, 2.92, -2.68}, {4.45, 3.08, -2.55});
-
-    w.box("PaintingFrameLeft", "frame", {-4.02, 2.10, -2.62}, {-3.90, 2.92, -2.50});
-    w.box("PaintingFrameRight", "frame", {0.45, 2.10, -2.62}, {0.57, 2.92, -2.50});
-    w.box("PaintingFrameTop", "frame", {-4.02, 2.80, -2.62}, {0.57, 2.92, -2.50});
-    w.box("PaintingFrameBottom", "frame", {-4.02, 2.10, -2.62}, {0.57, 2.22, -2.50});
-    w.quad("PaintingPanelBlue", "painting_blue", {-3.90, 2.22, -2.57}, {-2.40, 2.22, -2.57}, {-2.40, 2.80, -2.57}, {-3.90, 2.80, -2.57});
-    w.quad("PaintingPanelGreen", "painting_green", {-2.40, 2.22, -2.57}, {-1.10, 2.22, -2.57}, {-1.10, 2.80, -2.57}, {-2.40, 2.80, -2.57});
-    w.quad("PaintingPanelYellow", "painting_yellow", {-1.10, 2.22, -2.57}, {-0.10, 2.22, -2.57}, {-0.10, 2.80, -2.57}, {-1.10, 2.80, -2.57});
-    w.quad("PaintingPanelRed", "painting_red", {-0.10, 2.22, -2.57}, {0.45, 2.22, -2.57}, {0.45, 2.80, -2.57}, {-0.10, 2.80, -2.57});
-    w.box("PaintingTreeTrunk", "bark", {-0.98, 2.18, -2.50}, {-0.88, 2.84, -2.44});
-    w.quad("PaintingBranchA", "bark", {-0.95, 2.58, -2.49}, {-1.55, 2.70, -2.49}, {-1.52, 2.76, -2.47}, {-0.92, 2.64, -2.47});
-    w.quad("PaintingBranchB", "bark", {-0.91, 2.66, -2.49}, {-0.30, 2.76, -2.49}, {-0.33, 2.82, -2.47}, {-0.94, 2.72, -2.47});
-    for (int i = 0; i < 22; ++i) {
-        double x = -1.95 + 0.18 * (i % 12);
-        double y = 2.46 + 0.055 * (i % 5) + 0.10 * (i / 12);
-        w.ellipseSurface("PaintingBlossom", "blossom", {x, y, -2.47}, 0.035, 0.030, -2.43, 8);
+    for (int i = 0; i < 12; ++i) {
+        double x = -5.10 + 0.76 * (i % 6);
+        double y = 1.70 + 0.24 * (i / 6) + 0.04 * (i % 3);
+        w.quad("BackWallCrack", "plaster_shadow", {x, y, -3.03}, {x + 0.38, y + 0.09, -3.03},
+               {x + 0.39, y + 0.11, -3.00}, {x + 0.01, y + 0.02, -3.00});
     }
-    for (int i = 0; i < 16; ++i) {
-        double x = -0.58 + 0.12 * (i % 8);
-        double y = 2.48 + 0.065 * (i % 5);
-        w.ellipseSurface("PaintingBlossomWarm", "blossom", {x, y, -2.47}, 0.040, 0.032, -2.43, 8);
+    for (int i = 0; i < 10; ++i) {
+        double x = -5.80;
+        double y = 0.46 + 0.22 * (i % 5);
+        double z = -2.45 + 0.50 * (i / 5);
+        w.quad("LeftWallDamage", (i % 2 == 0) ? "plaster_raw" : "plaster_shadow",
+               {x + 0.08, y, z}, {x + 0.08, y + 0.16, z + 0.05}, {x + 0.08, y + 0.13, z + 0.32}, {x + 0.08, y - 0.02, z + 0.20});
     }
-    w.quad("HighPaintingBlue", "painting_blue", {-3.82, 2.55, -2.38}, {-2.20, 2.55, -2.38}, {-2.20, 3.02, -2.38}, {-3.82, 3.02, -2.38});
-    w.quad("HighPaintingGreen", "painting_green", {-2.20, 2.55, -2.38}, {-1.00, 2.55, -2.38}, {-1.00, 3.02, -2.38}, {-2.20, 3.02, -2.38});
-    w.quad("HighPaintingYellow", "painting_yellow", {-1.00, 2.55, -2.38}, {-0.18, 2.55, -2.38}, {-0.18, 3.02, -2.38}, {-1.00, 3.02, -2.38});
-    w.quad("HighPaintingRed", "painting_red", {-0.18, 2.55, -2.38}, {0.44, 2.55, -2.38}, {0.44, 3.02, -2.38}, {-0.18, 3.02, -2.38});
-    w.box("HighPaintingTrunk", "bark", {-0.90, 2.52, -2.34}, {-0.80, 3.03, -2.28});
-    for (int i = 0; i < 18; ++i) {
-        double x = -1.62 + 0.14 * (i % 12);
-        double y = 2.70 + 0.06 * (i % 4);
-        w.ellipseSurface("HighPaintingBlossom", "blossom", {x, y, -2.34}, 0.035, 0.030, -2.27, 8);
-    }
-    w.quad("VisibleLeftPaintingBlue", "painting_blue", {-4.35, 2.34, -2.18}, {-3.30, 2.34, -2.18}, {-3.30, 2.88, -2.18}, {-4.35, 2.88, -2.18});
-    w.quad("VisibleLeftPaintingGreen", "painting_green", {-3.30, 2.34, -2.18}, {-2.35, 2.34, -2.18}, {-2.35, 2.88, -2.18}, {-3.30, 2.88, -2.18});
-    w.quad("VisibleLeftPaintingGold", "painting_yellow", {-2.35, 2.34, -2.18}, {-1.42, 2.34, -2.18}, {-1.42, 2.88, -2.18}, {-2.35, 2.88, -2.18});
-    w.quad("VisibleLeftPaintingTrunk", "bark", {-2.05, 2.36, -2.12}, {-1.86, 2.36, -2.12}, {-1.66, 2.88, -2.12}, {-1.84, 2.88, -2.12});
-    for (int i = 0; i < 26; ++i) {
-        double x = -3.55 + 0.15 * (i % 12);
-        double y = 2.52 + 0.065 * (i % 5);
-        w.ellipseSurface("VisibleLeftPaintingBlossom", "blossom", {x, y, -2.12}, 0.034, 0.030, -2.06, 8);
+    for (int i = 0; i < 14; ++i) {
+        double x = 5.72;
+        double y = 0.36 + 0.17 * (i % 7);
+        double z = -2.20 + 0.54 * (i / 7);
+        w.quad("RightWallPeel", (i % 3 == 0) ? "plaster_light" : "plaster_raw",
+               {x - 0.08, y, z}, {x - 0.08, y + 0.11, z + 0.10}, {x - 0.08, y + 0.10, z + 0.36}, {x - 0.08, y - 0.02, z + 0.28});
     }
 
-    w.box("WindowOuterLeft", "matte_black", {1.10, 0.35, -2.42}, {1.26, 3.05, -2.18});
-    w.box("WindowOuterRight", "matte_black", {4.18, 0.35, -2.42}, {4.36, 3.05, -2.18});
-    w.box("WindowOuterTop", "matte_black", {1.10, 2.88, -2.42}, {4.36, 3.05, -2.18});
-    w.box("WindowOuterBottom", "matte_black", {1.10, 0.35, -2.42}, {4.36, 0.52, -2.18});
-    w.quad("WindowWarmGlassA", "glass_warm", {1.26, 0.52, -2.37}, {2.52, 0.52, -2.37}, {2.52, 2.88, -2.37}, {1.26, 2.88, -2.37});
-    w.quad("WindowWarmGlassB", "window_glow", {2.68, 0.52, -2.37}, {4.18, 0.52, -2.37}, {4.18, 2.88, -2.37}, {2.68, 2.88, -2.37});
-    w.box("WindowCenterBar", "matte_black", {2.52, 0.40, -2.30}, {2.68, 3.05, -2.08});
-    w.box("WindowRightBar", "matte_black", {3.78, 0.52, -2.30}, {3.92, 2.88, -2.08});
-    for (int i = 0; i < 5; ++i) {
-        double y = 0.78 + i * 0.34;
-        w.box("WindowRightMullion", "matte_black", {2.86, y, -2.28}, {4.10, y + 0.055, -2.06});
+    w.quad("DustPatchNearDoor", "dust", {2.30, 0.018, -2.70}, {4.80, 0.018, -2.70}, {4.45, 0.018, -1.64}, {2.10, 0.018, -1.58});
+    w.quad("DustPatchFireplace", "dust", {-4.80, 0.019, -2.60}, {-1.55, 0.019, -2.68}, {-1.85, 0.019, -1.48}, {-4.45, 0.019, -1.34});
+    for (int i = 0; i < 20; ++i) {
+        double x = -5.00 + 0.48 * (i % 10);
+        double z = -2.35 + 0.28 * (i / 10) + 0.04 * (i % 4);
+        w.box("SmallDebris", (i % 2 == 0) ? "old_wood_dark" : "plaster_raw",
+              {x, 0.02, z}, {x + 0.07 + 0.03 * (i % 3), 0.055, z + 0.035 + 0.02 * (i % 2)});
     }
-    w.quad("WarmInteriorGlow", "window_glow", {2.85, 0.55, -2.65}, {4.18, 0.55, -2.65}, {4.18, 2.85, -2.65}, {2.85, 2.85, -2.65});
-    w.box("InteriorColumn", "matte_black", {2.95, 0.55, -2.02}, {3.10, 2.35, -1.80});
-    w.box("InteriorColumnCap", "matte_black", {2.82, 2.28, -2.02}, {3.23, 2.43, -1.78});
-    w.box("InteriorRailingBase", "bark", {1.50, 0.92, -2.03}, {3.00, 1.02, -1.82});
-    w.quad("InteriorStairRailA", "bark", {1.40, 1.00, -1.92}, {2.62, 1.70, -1.92}, {2.58, 1.79, -1.86}, {1.36, 1.09, -1.86});
-    w.quad("InteriorStairRailB", "bark", {1.55, 0.72, -1.91}, {2.82, 1.44, -1.91}, {2.78, 1.52, -1.85}, {1.51, 0.80, -1.85});
-    for (int i = 0; i < 4; ++i) {
-        double x = 1.65 + i * 0.32;
-        w.box("RailingSpindle", "bark", {x, 0.88, -1.92}, {x + 0.045, 1.45, -1.82});
-    }
-    w.box("RightDarkDrape", "matte_black", {4.05, 0.40, -1.95}, {4.45, 3.00, -1.65});
-    w.quad("StoneWallReflectionPlane", "stone", {-1.10, 0.86, -2.50}, {1.10, 0.86, -2.50}, {1.10, 1.80, -2.50}, {-1.10, 1.80, -2.50});
-    for (int r = 0; r < 5; ++r) {
-        for (int c = 0; c < 5; ++c) {
-            double x0 = -1.08 + c * 0.44 + 0.05 * (r % 2);
-            double y0 = 0.92 + r * 0.18;
-            w.box("StoneJoint", "dark_wall", {x0, y0, -2.43}, {x0 + 0.36, y0 + 0.035, -2.36});
-        }
-    }
+    w.box("LooseBoardA", "old_wood_dark", {-3.85, 0.035, -1.00}, {-1.95, 0.105, -0.82});
+    w.box("LooseBoardB", "old_wood", {2.45, 0.035, -1.04}, {3.90, 0.100, -0.86});
 
-    w.box("MirrorBackPlate", "matte_black", {-1.32, 0.72, 0.84}, {1.32, 2.24, 0.90});
-    w.quad("TableMirrorSurface", "mirror", {-1.08, 0.91, 0.915}, {1.08, 0.91, 0.915},
-           {1.08, 2.05, 0.915}, {-1.08, 2.05, 0.915});
-    w.box("MirrorFrameLeft", "frame", {-1.32, 0.72, 0.92}, {-1.08, 2.24, 1.03});
-    w.box("MirrorFrameRight", "frame", {1.08, 0.72, 0.92}, {1.32, 2.24, 1.03});
-    w.box("MirrorFrameTop", "frame", {-1.32, 2.05, 0.92}, {1.32, 2.24, 1.03});
-    w.box("MirrorFrameBottom", "frame", {-1.32, 0.72, 0.92}, {1.32, 0.91, 1.03});
+    w.box("MirrorBackPlate", "matte_black", {-0.92, 0.06, 1.10}, {0.92, 1.16, 1.16});
+    w.quad("FloorMirrorSurface", "mirror", {-0.72, 0.22, 1.175}, {0.72, 0.22, 1.175},
+           {0.72, 0.98, 1.175}, {-0.72, 0.98, 1.175});
+    w.box("MirrorFrameLeft", "frame", {-0.92, 0.06, 1.18}, {-0.72, 1.16, 1.28});
+    w.box("MirrorFrameRight", "frame", {0.72, 0.06, 1.18}, {0.92, 1.16, 1.28});
+    w.box("MirrorFrameTop", "frame", {-0.92, 0.98, 1.18}, {0.92, 1.16, 1.28});
+    w.box("MirrorFrameBottom", "frame", {-0.92, 0.06, 1.18}, {0.92, 0.22, 1.28});
 
     double ls = opt.lightSize;
     Vec3 lp{opt.lightPos[0], opt.lightPos[1], opt.lightPos[2]};
     w.quad("MainLight", "light_panel", {lp.x - ls, lp.y, lp.z - 0.35 * ls}, {lp.x + ls, lp.y, lp.z - 0.35 * ls},
            {lp.x + ls, lp.y, lp.z + 0.35 * ls}, {lp.x - ls, lp.y, lp.z + 0.35 * ls});
+    w.quad("FillLight", "light_fill", {-5.20, 2.95, 6.20}, {5.20, 2.95, 6.20}, {5.20, 2.95, 3.55}, {-5.20, 2.95, 3.55});
     if (opt.extraLight) {
-        w.quad("AuxLight", "light_panel", {-3.8, 2.1, 0.2}, {-3.8, 1.1, 0.2}, {-3.8, 1.1, 2.5}, {-3.8, 2.1, 2.5});
+        w.quad("AuxLight", "light_fill", {-5.45, 2.75, 6.20}, {-5.45, 1.35, 6.20}, {-5.45, 1.35, 3.55}, {-5.45, 2.75, 3.55});
     }
 
     const std::string assetDir = "Free_Stuff_1_-__Chess_Set/OBJ/";
@@ -313,18 +366,18 @@ void writeSceneObj(const BuildOptions &opt) {
         w.model(assetDir + file, name, mat, p, scale, angle);
     };
 
-    place("GEO_WhitePawn_08.obj", "VisiblePawnA", "white_piece", {-1.15, 0.73, 3.05}, 0.0, 6.6);
-    place("GEO_WhitePawn_08.obj", "VisiblePawnB", "white_piece", {-0.46, 0.73, 2.98}, 0.0, 6.6);
-    place("GEO_WhitePawn_08.obj", "VisiblePawnC", "white_piece", {0.46, 0.73, 2.98}, 0.0, 6.6);
-    place("GEO_WhitePawn_08.obj", "VisiblePawnD", "white_piece", {1.15, 0.73, 3.05}, 0.0, 6.6);
+    place("GEO_WhitePawn_08.obj", "VisiblePawnA", "ceramic", {-1.02, 0.01, 3.50}, 0.0, 5.6);
+    place("GEO_WhitePawn_08.obj", "VisiblePawnB", "ceramic", {-0.36, 0.01, 3.44}, 0.0, 5.6);
+    place("GEO_WhitePawn_08.obj", "VisiblePawnC", "ceramic", {0.36, 0.01, 3.44}, 0.0, 5.6);
+    place("GEO_WhitePawn_08.obj", "VisiblePawnD", "ceramic", {1.02, 0.01, 3.50}, 0.0, 5.6);
 
-    place("GEO_WhiteRook_02.obj", "VisibleWhiteRook", "white_piece", {-1.02, 0.73, 2.34}, 0.0, 6.8);
-    place("GEO_WhiteKnight_02.obj", "CameraOnlyWhiteKnight", "white_piece", {-0.60, 0.73, 2.42}, -0.25, 6.8);
-    place("GEO_WhiteBishop_02.obj", "ReflectionOnlyWhiteBishop", "white_piece", {-0.60, 0.73, 2.42}, 0.0, 7.0);
-    place("GEO_WhiteBishop_02.obj", "VisibleWhiteBishop", "white_piece", {-0.22, 0.73, 2.50}, 0.0, 7.0);
-    place("GEO_WhiteKing.obj", "VisibleWhiteKing", "white_piece", {0.20, 0.73, 2.47}, 0.0, 7.8);
-    place("GEO_WhiteQueen.obj", "CameraOnlyWhiteQueen", "white_piece", {0.78, 0.73, 2.34}, 0.0, 7.1);
-    place("GEO_WhiteKing.obj", "ReflectionOnlyWhiteKing", "white_piece", {0.78, 0.73, 2.34}, 0.0, 7.5);
+    place("GEO_WhiteRook_02.obj", "VisibleWhiteRook", "ceramic", {-0.86, 0.01, 2.92}, 0.0, 5.8);
+    place("GEO_WhiteKnight_02.obj", "CameraOnlyWhiteKnight", "ceramic", {-0.48, 0.01, 2.98}, -0.25, 5.8);
+    place("GEO_WhiteBishop_02.obj", "ReflectionOnlyWhiteBishop", "ceramic", {-0.48, 0.01, 2.98}, 0.0, 6.0);
+    place("GEO_WhiteBishop_02.obj", "VisibleWhiteBishop", "ceramic", {-0.14, 0.01, 3.02}, 0.0, 6.0);
+    place("GEO_WhiteKing.obj", "VisibleWhiteKing", "ceramic", {0.22, 0.01, 3.00}, 0.0, 6.7);
+    place("GEO_WhiteQueen.obj", "CameraOnlyWhiteQueen", "ceramic", {0.72, 0.01, 2.92}, 0.0, 6.1);
+    place("GEO_WhiteKing.obj", "ReflectionOnlyWhiteKing", "ceramic", {0.72, 0.01, 2.92}, 0.0, 6.4);
 }
 
 } // namespace scene_builder
