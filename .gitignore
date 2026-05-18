@@ -1,0 +1,24 @@
+.DS_Store
+build/
+dist/
+*.o
+*.zip
+*.tar.gz
+Research-Project2-2026-v7.pdf
+
+# Keep the repository small: the renderer only needs these OBJ chess assets.
+Free_Stuff_1_-__Chess_Set/*
+!Free_Stuff_1_-__Chess_Set/OBJ/
+Free_Stuff_1_-__Chess_Set/OBJ/*
+!Free_Stuff_1_-__Chess_Set/OBJ/GEO_WhitePawn_08.obj
+!Free_Stuff_1_-__Chess_Set/OBJ/GEO_WhitePawn_08.mtl
+!Free_Stuff_1_-__Chess_Set/OBJ/GEO_WhiteRook_02.obj
+!Free_Stuff_1_-__Chess_Set/OBJ/GEO_WhiteRook_02.mtl
+!Free_Stuff_1_-__Chess_Set/OBJ/GEO_WhiteKnight_02.obj
+!Free_Stuff_1_-__Chess_Set/OBJ/GEO_WhiteKnight_02.mtl
+!Free_Stuff_1_-__Chess_Set/OBJ/GEO_WhiteBishop_02.obj
+!Free_Stuff_1_-__Chess_Set/OBJ/GEO_WhiteBishop_02.mtl
+!Free_Stuff_1_-__Chess_Set/OBJ/GEO_WhiteKing.obj
+!Free_Stuff_1_-__Chess_Set/OBJ/GEO_WhiteKing.mtl
+!Free_Stuff_1_-__Chess_Set/OBJ/GEO_WhiteQueen.obj
+!Free_Stuff_1_-__Chess_Set/OBJ/GEO_WhiteQueen.mtl
