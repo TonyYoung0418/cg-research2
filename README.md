@@ -33,10 +33,10 @@ cmake --build build
 ```
 
 Controls: left-drag to orbit, right-drag to pan, mouse wheel or `W`/`S` to zoom,
-`1`-`4` to switch saved viewpoints, arrow keys to rotate, `V` to toggle between
-camera-visible and reflection-visible chess pieces, `R` to reset, and `Esc` to
-quit. This viewer is for real-time inspection; the final mirror reflection is
-still rendered by the path tracer.
+`1`-`4` to switch saved viewpoints, arrow keys to rotate, `V` to toggle the
+mirror between camera-visible and reflection-visible chess pieces, `R` to reset,
+and `Esc` to quit. The OpenGL viewer renders a real-time planar mirror preview
+for inspection; the final image is still rendered by the path tracer.
 
 For fast previews:
 

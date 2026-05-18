@@ -54,10 +54,11 @@ struct Tri {
     Material mat;
     bool cameraOnly = false;
     bool reflectionOnly = false;
+    bool mirrorSurface = false;
 };
 
 std::vector<Tri> gTris;
-bool gShowReflectionOnly = false;
+bool gMirrorShowsReflectionOnly = true;
 int gWidth = 1280;
 int gHeight = 800;
 float gYaw = 0.0f;
@@ -139,6 +140,7 @@ void loadObj(const std::string &objPath, const std::string &mtlPath) {
                 tri.mat = currentMat;
                 tri.cameraOnly = startsWith(currentObj, "CameraOnly");
                 tri.reflectionOnly = startsWith(currentObj, "ReflectionOnly");
+                tri.mirrorSurface = currentObj == "TableMirrorSurface";
                 gTris.push_back(tri);
             }
         }
@@ -204,8 +206,84 @@ void drawText(float x, float y, const std::string &text) {
     glMatrixMode(GL_MODELVIEW);
 }
 
+enum class ObjectSet {
+    Camera,
+    Reflection
+};
+
+bool shouldDraw(const Tri &tri, ObjectSet set) {
+    if (tri.mirrorSurface) return false;
+    if (set == ObjectSet::Camera) return !tri.reflectionOnly;
+    return !tri.cameraOnly;
+}
+
+void setMaterialColor(const Material &mat, float emissionScale = 0.08f) {
+    Vec3 color = mat.kd + mat.ke * emissionScale;
+    color.x = std::min(color.x, 1.0f);
+    color.y = std::min(color.y, 1.0f);
+    color.z = std::min(color.z, 1.0f);
+    glColor3f(color.x, color.y, color.z);
+}
+
+void drawScene(ObjectSet set) {
+    glBegin(GL_TRIANGLES);
+    for (const Tri &tri : gTris) {
+        if (!shouldDraw(tri, set)) continue;
+        setMaterialColor(tri.mat);
+        glNormal3f(tri.n.x, tri.n.y, tri.n.z);
+        glVertex3f(tri.a.x, tri.a.y, tri.a.z);
+        glVertex3f(tri.b.x, tri.b.y, tri.b.z);
+        glVertex3f(tri.c.x, tri.c.y, tri.c.z);
+    }
+    glEnd();
+}
+
+void drawMirrorQuad() {
+    glBegin(GL_QUADS);
+    glVertex3f(-1.08f, 0.91f, 0.915f);
+    glVertex3f(1.08f, 0.91f, 0.915f);
+    glVertex3f(1.08f, 2.05f, 0.915f);
+    glVertex3f(-1.08f, 2.05f, 0.915f);
+    glEnd();
+}
+
+void drawMirrorReflection() {
+    constexpr float mirrorZ = 0.915f;
+
+    glEnable(GL_STENCIL_TEST);
+    glClear(GL_STENCIL_BUFFER_BIT);
+    glStencilMask(0xFF);
+    glStencilFunc(GL_ALWAYS, 1, 0xFF);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+    glDepthMask(GL_FALSE);
+    glDisable(GL_LIGHTING);
+    drawMirrorQuad();
+    glEnable(GL_LIGHTING);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glDepthMask(GL_TRUE);
+
+    glStencilFunc(GL_EQUAL, 1, 0xFF);
+    glStencilMask(0x00);
+    glPushMatrix();
+    glTranslatef(0.0f, 0.0f, 2.0f * mirrorZ);
+    glScalef(1.0f, 1.0f, -1.0f);
+    drawScene(gMirrorShowsReflectionOnly ? ObjectSet::Reflection : ObjectSet::Camera);
+    glPopMatrix();
+    glDisable(GL_STENCIL_TEST);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_LIGHTING);
+    glColor4f(0.82f, 0.88f, 0.95f, 0.22f);
+    drawMirrorQuad();
+    glEnable(GL_LIGHTING);
+    glDisable(GL_BLEND);
+}
+
 void display() {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     gluPerspective(54.0, double(gWidth) / double(std::max(1, gHeight)), 0.03, 80.0);
@@ -222,27 +300,11 @@ void display() {
     glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
     glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambient);
 
-    glBegin(GL_TRIANGLES);
-    for (const Tri &tri : gTris) {
-        if (gShowReflectionOnly) {
-            if (tri.cameraOnly) continue;
-        } else {
-            if (tri.reflectionOnly) continue;
-        }
-        Vec3 color = tri.mat.kd + tri.mat.ke * 0.08f;
-        color.x = std::min(color.x, 1.0f);
-        color.y = std::min(color.y, 1.0f);
-        color.z = std::min(color.z, 1.0f);
-        glColor3f(color.x, color.y, color.z);
-        glNormal3f(tri.n.x, tri.n.y, tri.n.z);
-        glVertex3f(tri.a.x, tri.a.y, tri.a.z);
-        glVertex3f(tri.b.x, tri.b.y, tri.b.z);
-        glVertex3f(tri.c.x, tri.c.y, tri.c.z);
-    }
-    glEnd();
+    drawScene(ObjectSet::Camera);
+    drawMirrorReflection();
 
-    drawText(14.0f, float(gHeight - 24), "Mouse drag: orbit | Right drag: pan | Wheel/W/S: zoom | 1-4: views | V: camera/reflection objects | R: reset | Esc: quit");
-    drawText(14.0f, float(gHeight - 42), gShowReflectionOnly ? "Mode: reflection-object preview" : "Mode: camera-object preview");
+    drawText(14.0f, float(gHeight - 24), "Mouse drag: orbit | Right drag: pan | Wheel/W/S: zoom | 1-4: views | V: mirror camera/reflection objects | R: reset | Esc: quit");
+    drawText(14.0f, float(gHeight - 42), gMirrorShowsReflectionOnly ? "Mirror mode: reflection-only mismatches" : "Mirror mode: camera-only comparison");
 
     glutSwapBuffers();
 }
@@ -313,7 +375,7 @@ void keyboard(unsigned char key, int, int) {
             return;
         case 'v':
         case 'V':
-            gShowReflectionOnly = !gShowReflectionOnly;
+            gMirrorShowsReflectionOnly = !gMirrorShowsReflectionOnly;
             glutPostRedisplay();
             return;
         case 'w':
@@ -379,7 +441,7 @@ void printControls() {
               << "  A/D/Q/E/Z/X: move target\n"
               << "  Arrow keys: orbit camera\n"
               << "  1 main, 2 side, 3 top, 4 close mirror\n"
-              << "  V: toggle camera-only vs reflection-only objects\n"
+              << "  V: toggle mirror between camera-only comparison and reflection-only mismatches\n"
               << "  R: reset, Esc: quit\n";
 }
 
@@ -391,7 +453,7 @@ int main(int argc, char **argv) {
     printControls();
 
     glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH | GLUT_STENCIL);
     glutInitWindowSize(gWidth, gHeight);
     glutCreateWindow("Mirror Chess OpenGL Viewer");
     initGl();
