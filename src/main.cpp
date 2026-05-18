@@ -192,7 +192,7 @@ struct Options {
     Vec3 floorColor{0.36, 0.34, 0.30};
     double objectRotateY = 0.0;
     double fov = 48.0;
-    double lightSize = 0.58;
+    double lightSize = 0.45;
     double metalRoughness = 0.12;
 };
 
@@ -289,9 +289,21 @@ std::vector<Material> makeMaterials(const Options &opt, std::map<std::string, in
     add({"floor", opt.floorColor, {0, 0, 0}, 0, 1.5, 0, false});
     add({"wall", {0.66, 0.62, 0.54}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"dark_wall", {0.12, 0.10, 0.08}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"trim", {0.78, 0.70, 0.56}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"curtain", {0.36, 0.045, 0.040}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"curtain_dark", {0.16, 0.025, 0.025}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"rug", {0.34, 0.055, 0.045}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"rug_border", {0.78, 0.58, 0.24}, {0, 0, 0}, 0.1, 1.5, 1, false});
     add({"table", {0.42, 0.20, 0.08}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"table_dark", {0.08, 0.045, 0.025}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"frame", {0.90, 0.62, 0.24}, {0, 0, 0}, 0.0, 1.5, 0, false});
+    add({"brass", {0.80, 0.57, 0.22}, {0, 0, 0}, 0.12, 1.5, 1, false});
+    add({"ceramic", {0.82, 0.76, 0.64}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"leaf", {0.10, 0.35, 0.16}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"book_red", {0.45, 0.055, 0.040}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"book_blue", {0.055, 0.15, 0.34}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"book_green", {0.08, 0.28, 0.16}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"lamp_shade", {0.88, 0.77, 0.56}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"mirror", {0.98, 0.99, 1.0}, {0, 0, 0}, 0.0, 1.5, 1, false});
     add({"painting_green", {0.16, 0.46, 0.40}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"painting_orange", {0.78, 0.34, 0.12}, {0, 0, 0}, 0, 1.5, 0, false});
@@ -301,7 +313,7 @@ std::vector<Material> makeMaterials(const Options &opt, std::map<std::string, in
     add({"matte_black", {0.02, 0.02, 0.025}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"metal", {0.78, 0.78, 0.74}, {0, 0, 0}, opt.metalRoughness, 1.5, 1, false});
     add({"glass", {0.94, 0.98, 1.0}, {0, 0, 0}, 0.01, 1.52, 2, false});
-    add({"light_panel", {1, 1, 1}, {13.0, 11.0, 8.5}, 0, 1.5, 3, true});
+    add({"light_panel", {1, 1, 1}, {22.0, 18.0, 13.5}, 0, 1.5, 3, true});
     return m;
 }
 

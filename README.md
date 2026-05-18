@@ -26,18 +26,6 @@ cmake --build build
 ./build/MirrorReflectionRenderer --preset side --width 800 --height 600 --spp 64 --output renders/view_side.ppm
 ```
 
-## Interactive OpenGL viewer
-
-```bash
-./build/MirrorReflectionViewer
-```
-
-Controls: left-drag to orbit, right-drag to pan, mouse wheel or `W`/`S` to zoom,
-`1`-`4` to switch saved viewpoints, arrow keys to rotate, `V` to toggle the
-mirror between camera-visible and reflection-visible chess pieces, `R` to reset,
-and `Esc` to quit. The OpenGL viewer renders a real-time planar mirror preview
-for inspection; the final image is still rendered by the path tracer.
-
 For fast previews:
 
 ```bash
@@ -58,10 +46,6 @@ on every run, then renders from the loaded OBJ geometry.
 
 ## Prepared files
 
-- `docs/report.md`: conference-style report draft. Replace the author names and
-  contribution details before final submission, then export to PDF.
-- `docs/presentation.md`: 10-slide seminar outline with result image slots filled.
-- `docs/peer_review_template.md`: confidential peer review template.
 - `renders/view_main.png` and `renders/view_side.png`: generated 800x600 result
   images from two viewpoints.
 - `Free_Stuff_1_-__Chess_Set/OBJ/`: the subset of the downloaded chess OBJ

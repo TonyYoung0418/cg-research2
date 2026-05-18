@@ -10,6 +10,26 @@ newmtl dark_wall
 Kd 0.12 0.1 0.08
 Ke 0 0 0
 
+newmtl trim
+Kd 0.78 0.7 0.56
+Ke 0 0 0
+
+newmtl curtain
+Kd 0.36 0.045 0.04
+Ke 0 0 0
+
+newmtl curtain_dark
+Kd 0.16 0.025 0.025
+Ke 0 0 0
+
+newmtl rug
+Kd 0.34 0.055 0.045
+Ke 0 0 0
+
+newmtl rug_border
+Kd 0.78 0.58 0.24
+Ke 0 0 0
+
 newmtl table
 Kd 0.42 0.2 0.08
 Ke 0 0 0
@@ -20,6 +40,34 @@ Ke 0 0 0
 
 newmtl frame
 Kd 0.9 0.62 0.24
+Ke 0 0 0
+
+newmtl brass
+Kd 0.8 0.57 0.22
+Ke 0 0 0
+
+newmtl ceramic
+Kd 0.82 0.76 0.64
+Ke 0 0 0
+
+newmtl leaf
+Kd 0.1 0.35 0.16
+Ke 0 0 0
+
+newmtl book_red
+Kd 0.45 0.055 0.04
+Ke 0 0 0
+
+newmtl book_blue
+Kd 0.055 0.15 0.34
+Ke 0 0 0
+
+newmtl book_green
+Kd 0.08 0.28 0.16
+Ke 0 0 0
+
+newmtl lamp_shade
+Kd 0.88 0.77 0.56
 Ke 0 0 0
 
 newmtl mirror
@@ -52,5 +100,5 @@ Ke 0 0 0
 
 newmtl light_panel
 Kd 1 1 1
-Ke 13 11 8.5
+Ke 22 18 13.5
 
