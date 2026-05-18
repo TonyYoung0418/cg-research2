@@ -26,6 +26,18 @@ cmake --build build
 ./build/MirrorReflectionRenderer --preset side --width 800 --height 600 --spp 64 --output renders/view_side.ppm
 ```
 
+## Interactive OpenGL viewer
+
+```bash
+./build/MirrorReflectionViewer
+```
+
+Controls: left-drag to orbit, right-drag to pan, mouse wheel or `W`/`S` to zoom,
+`1`-`4` to switch saved viewpoints, arrow keys to rotate, `V` to toggle between
+camera-visible and reflection-visible chess pieces, `R` to reset, and `Esc` to
+quit. This viewer is for real-time inspection; the final mirror reflection is
+still rendered by the path tracer.
+
 For fast previews:
 
 ```bash
