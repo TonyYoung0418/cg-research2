@@ -8,9 +8,9 @@ little off". The chess pieces are imported from the downloaded TurboSquid "Free
 Stuff 1 - Chess Set" OBJ assets.
 
 The final scene intentionally makes the reflection inconsistent: the right-side
-queen visible in the room is replaced by a king in the mirror. This is
-implemented with camera-only and reflection-only mesh visibility rather than a
-post-process image trick.
+queen visible in the room is replaced by a king in the mirror, and the left-side
+knight is replaced by a bishop. This is implemented with camera-only and
+reflection-only mesh visibility rather than a post-process image trick.
 
 ## Build
 
