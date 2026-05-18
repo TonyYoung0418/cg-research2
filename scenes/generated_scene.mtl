@@ -3,11 +3,11 @@ Kd 0.36 0.34 0.3
 Ke 0 0 0
 
 newmtl wall
-Kd 0.66 0.62 0.54
+Kd 0.62 0.56 0.43
 Ke 0 0 0
 
 newmtl dark_wall
-Kd 0.12 0.1 0.08
+Kd 0.1 0.085 0.06
 Ke 0 0 0
 
 newmtl trim
@@ -36,6 +36,14 @@ Ke 0 0 0
 
 newmtl table_dark
 Kd 0.08 0.045 0.025
+Ke 0 0 0
+
+newmtl wood_light
+Kd 0.72 0.36 0.13
+Ke 0 0 0
+
+newmtl wood_glow
+Kd 0.96 0.55 0.18
 Ke 0 0 0
 
 newmtl frame
@@ -70,21 +78,49 @@ newmtl lamp_shade
 Kd 0.88 0.77 0.56
 Ke 0 0 0
 
+newmtl glass_warm
+Kd 0.78 0.58 0.18
+Ke 0.55 0.34 0.09
+
+newmtl window_glow
+Kd 1 0.72 0.2
+Ke 1.25 0.72 0.2
+
+newmtl stone
+Kd 0.3 0.31 0.29
+Ke 0 0 0
+
+newmtl bark
+Kd 0.22 0.1 0.035
+Ke 0 0 0
+
+newmtl blossom
+Kd 0.94 0.88 0.78
+Ke 0 0 0
+
+newmtl painting_blue
+Kd 0.15 0.48 0.52
+Ke 0.025 0.075 0.08
+
+newmtl painting_yellow
+Kd 0.72 0.53 0.14
+Ke 0.1 0.07 0.015
+
 newmtl mirror
 Kd 0.98 0.99 1
 Ke 0 0 0
 
 newmtl painting_green
 Kd 0.16 0.46 0.4
-Ke 0 0 0
+Ke 0.035 0.08 0.06
 
 newmtl painting_orange
 Kd 0.78 0.34 0.12
-Ke 0 0 0
+Ke 0.12 0.045 0.015
 
 newmtl painting_red
 Kd 0.52 0.08 0.06
-Ke 0 0 0
+Ke 0.08 0.012 0.008
 
 newmtl white_piece
 Kd 0.86 0.82 0.7

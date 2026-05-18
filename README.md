@@ -12,6 +12,10 @@ queen visible in the room is replaced by a king in the mirror, and the left-side
 knight is replaced by a bishop. This is implemented with camera-only and
 reflection-only mesh visibility rather than a post-process image trick.
 
+The room background is procedurally modeled after the reference final scene:
+warm wood planks, a beige wall with a horizontal floral painting, and a dark
+black-framed window with warm interior highlights.
+
 ## Build
 
 ```bash

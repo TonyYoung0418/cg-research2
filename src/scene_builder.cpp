@@ -147,8 +147,8 @@ void writeMtl(const BuildOptions &opt) {
         mtl << "Ke " << ke.x << " " << ke.y << " " << ke.z << "\n\n";
     };
     mat("floor", {opt.floorColor[0], opt.floorColor[1], opt.floorColor[2]});
-    mat("wall", {0.66, 0.62, 0.54});
-    mat("dark_wall", {0.12, 0.10, 0.08});
+    mat("wall", {0.62, 0.56, 0.43});
+    mat("dark_wall", {0.10, 0.085, 0.060});
     mat("trim", {0.78, 0.70, 0.56});
     mat("curtain", {0.36, 0.045, 0.040});
     mat("curtain_dark", {0.16, 0.025, 0.025});
@@ -156,6 +156,8 @@ void writeMtl(const BuildOptions &opt) {
     mat("rug_border", {0.78, 0.58, 0.24});
     mat("table", {0.42, 0.20, 0.08});
     mat("table_dark", {0.08, 0.045, 0.025});
+    mat("wood_light", {0.72, 0.36, 0.13});
+    mat("wood_glow", {0.96, 0.55, 0.18});
     mat("frame", {0.90, 0.62, 0.24});
     mat("brass", {0.80, 0.57, 0.22});
     mat("ceramic", {0.82, 0.76, 0.64});
@@ -164,10 +166,17 @@ void writeMtl(const BuildOptions &opt) {
     mat("book_blue", {0.055, 0.15, 0.34});
     mat("book_green", {0.08, 0.28, 0.16});
     mat("lamp_shade", {0.88, 0.77, 0.56});
+    mat("glass_warm", {0.78, 0.58, 0.18}, {0.55, 0.34, 0.09});
+    mat("window_glow", {1.0, 0.72, 0.20}, {1.25, 0.72, 0.20});
+    mat("stone", {0.30, 0.31, 0.29});
+    mat("bark", {0.22, 0.10, 0.035});
+    mat("blossom", {0.94, 0.88, 0.78});
+    mat("painting_blue", {0.15, 0.48, 0.52}, {0.025, 0.075, 0.08});
+    mat("painting_yellow", {0.72, 0.53, 0.14}, {0.10, 0.07, 0.015});
     mat("mirror", {0.98, 0.99, 1.0});
-    mat("painting_green", {0.16, 0.46, 0.40});
-    mat("painting_orange", {0.78, 0.34, 0.12});
-    mat("painting_red", {0.52, 0.08, 0.06});
+    mat("painting_green", {0.16, 0.46, 0.40}, {0.035, 0.08, 0.06});
+    mat("painting_orange", {0.78, 0.34, 0.12}, {0.12, 0.045, 0.015});
+    mat("painting_red", {0.52, 0.08, 0.06}, {0.08, 0.012, 0.008});
     mat("white_piece", {0.86, 0.82, 0.70});
     mat("black_piece", {0.035, 0.030, 0.026});
     mat("matte_black", {0.02, 0.02, 0.025});
@@ -187,23 +196,6 @@ void writeSceneObj(const BuildOptions &opt) {
     w.quad("RightWall", "dark_wall", {4.5, 0.0, -2.8}, {4.5, 0.0, 5.6}, {4.5, 3.1, 5.6}, {4.5, 3.1, -2.8});
     w.quad("Ceiling", "dark_wall", {-4.5, 3.1, 5.6}, {4.5, 3.1, 5.6}, {4.5, 3.1, -2.8}, {-4.5, 3.1, -2.8});
 
-    w.box("BackBaseboard", "trim", {-4.45, 0.02, -2.68}, {4.45, 0.18, -2.55});
-    w.box("BackCrownMoulding", "trim", {-4.45, 2.90, -2.68}, {4.45, 3.06, -2.55});
-    w.box("LeftBaseboard", "trim", {-4.42, 0.02, -2.70}, {-4.30, 0.18, 5.45});
-    w.box("RightBaseboard", "trim", {4.30, 0.02, -2.70}, {4.42, 0.18, 5.45});
-    for (int i = 0; i < 3; ++i) {
-        double x0 = -4.05 + i * 1.25;
-        double x1 = x0 + 0.92;
-        w.box("WallPanelLeftTrim", "trim", {x0, 0.55, -2.66}, {x0 + 0.045, 2.05, -2.57});
-        w.box("WallPanelRightTrim", "trim", {x1, 0.55, -2.66}, {x1 + 0.045, 2.05, -2.57});
-        w.box("WallPanelTopTrim", "trim", {x0, 2.00, -2.66}, {x1 + 0.045, 2.05, -2.57});
-        w.box("WallPanelBottomTrim", "trim", {x0, 0.55, -2.66}, {x1 + 0.045, 0.60, -2.57});
-    }
-    w.ellipseBand("WallClockFrame", "frame", {0.05, 2.55, -2.59}, 0.24, 0.24, 0.33, 0.33, -2.58, 56);
-    w.ellipseSurface("WallClockFace", "ceramic", {0.05, 2.55, -2.585}, 0.22, 0.22, -2.575, 18);
-    w.box("WallClockHandVertical", "matte_black", {0.03, 2.55, -2.55}, {0.07, 2.72, -2.51});
-    w.box("WallClockHandHorizontal", "matte_black", {0.05, 2.53, -2.55}, {0.19, 2.57, -2.51});
-
     w.box("TableTop", "table", {-4.2, 0.55, 0.10}, {4.2, 0.72, 5.35});
     for (int i = 0; i < 8; ++i) {
         double x = -4.2 + i * 1.2;
@@ -214,57 +206,90 @@ void writeSceneObj(const BuildOptions &opt) {
         w.quad("WoodLine", "table_dark", {-4.05, 0.731, z}, {4.05, 0.731, z + 0.012},
                {4.05, 0.731, z + 0.020}, {-4.05, 0.731, z + 0.008});
     }
-    w.quad("TableRunner", "rug", {-1.70, 0.734, 1.12}, {1.70, 0.734, 1.12}, {1.70, 0.734, 4.78}, {-1.70, 0.734, 4.78});
-    w.quad("TableRunnerLeftBorder", "rug_border", {-1.70, 0.736, 1.12}, {-1.58, 0.736, 1.12}, {-1.58, 0.736, 4.78}, {-1.70, 0.736, 4.78});
-    w.quad("TableRunnerRightBorder", "rug_border", {1.58, 0.736, 1.12}, {1.70, 0.736, 1.12}, {1.70, 0.736, 4.78}, {1.58, 0.736, 4.78});
-    w.quad("TableRunnerFrontBorder", "rug_border", {-1.70, 0.736, 4.62}, {1.70, 0.736, 4.62}, {1.70, 0.736, 4.78}, {-1.70, 0.736, 4.78});
-    w.quad("TableRunnerBackBorder", "rug_border", {-1.70, 0.736, 1.12}, {1.70, 0.736, 1.12}, {1.70, 0.736, 1.28}, {-1.70, 0.736, 1.28});
+    for (int i = 0; i < 18; ++i) {
+        double z = 0.45 + i * 0.26;
+        double x0 = -4.08 + 0.10 * (i % 3);
+        w.quad("WoodGrainWarm", "wood_light", {x0, 0.738, z}, {4.05, 0.738, z + 0.018},
+               {4.05, 0.738, z + 0.035}, {x0, 0.738, z + 0.012});
+    }
+    w.quad("WoodHighlight", "wood_glow", {-3.9, 0.740, 2.40}, {3.9, 0.740, 2.52}, {3.9, 0.740, 2.64}, {-3.9, 0.740, 2.55});
+    w.quad("WoodHighlightRight", "wood_glow", {1.1, 0.741, 1.30}, {4.05, 0.741, 1.43}, {4.05, 0.741, 1.55}, {1.1, 0.741, 1.44});
 
-    w.box("ArtFrameLeft", "frame", {-3.70, 2.20, -2.66}, {-3.58, 2.96, -2.54});
-    w.box("ArtFrameRight", "frame", {-0.38, 2.20, -2.66}, {-0.26, 2.96, -2.54});
-    w.box("ArtFrameTop", "frame", {-3.70, 2.84, -2.66}, {-0.26, 2.96, -2.54});
-    w.box("ArtFrameBottom", "frame", {-3.70, 2.20, -2.66}, {-0.26, 2.32, -2.54});
-    w.quad("WallArtLeft", "painting_green", {-3.6, 2.28, -2.76}, {-2.35, 2.28, -2.76}, {-2.35, 2.88, -2.76}, {-3.6, 2.88, -2.76});
-    w.quad("WallArtMid", "painting_orange", {-2.35, 2.28, -2.76}, {-1.35, 2.28, -2.76}, {-1.35, 2.88, -2.76}, {-2.35, 2.88, -2.76});
-    w.quad("WallArtRight", "painting_red", {-1.35, 2.28, -2.76}, {-0.35, 2.28, -2.76}, {-0.35, 2.88, -2.76}, {-1.35, 2.88, -2.76});
+    w.box("BackBaseboard", "trim", {-4.45, 0.02, -2.68}, {4.45, 0.16, -2.55});
+    w.box("BackCrownMoulding", "trim", {-4.45, 2.92, -2.68}, {4.45, 3.08, -2.55});
 
-    w.box("LeftCurtain", "curtain", {1.82, 0.68, -2.58}, {2.12, 2.82, -2.34});
-    w.box("RightCurtain", "curtain", {3.68, 0.68, -2.58}, {3.98, 2.82, -2.34});
+    w.box("PaintingFrameLeft", "frame", {-4.02, 2.10, -2.62}, {-3.90, 2.92, -2.50});
+    w.box("PaintingFrameRight", "frame", {0.45, 2.10, -2.62}, {0.57, 2.92, -2.50});
+    w.box("PaintingFrameTop", "frame", {-4.02, 2.80, -2.62}, {0.57, 2.92, -2.50});
+    w.box("PaintingFrameBottom", "frame", {-4.02, 2.10, -2.62}, {0.57, 2.22, -2.50});
+    w.quad("PaintingPanelBlue", "painting_blue", {-3.90, 2.22, -2.57}, {-2.40, 2.22, -2.57}, {-2.40, 2.80, -2.57}, {-3.90, 2.80, -2.57});
+    w.quad("PaintingPanelGreen", "painting_green", {-2.40, 2.22, -2.57}, {-1.10, 2.22, -2.57}, {-1.10, 2.80, -2.57}, {-2.40, 2.80, -2.57});
+    w.quad("PaintingPanelYellow", "painting_yellow", {-1.10, 2.22, -2.57}, {-0.10, 2.22, -2.57}, {-0.10, 2.80, -2.57}, {-1.10, 2.80, -2.57});
+    w.quad("PaintingPanelRed", "painting_red", {-0.10, 2.22, -2.57}, {0.45, 2.22, -2.57}, {0.45, 2.80, -2.57}, {-0.10, 2.80, -2.57});
+    w.box("PaintingTreeTrunk", "bark", {-0.98, 2.18, -2.50}, {-0.88, 2.84, -2.44});
+    w.quad("PaintingBranchA", "bark", {-0.95, 2.58, -2.49}, {-1.55, 2.70, -2.49}, {-1.52, 2.76, -2.47}, {-0.92, 2.64, -2.47});
+    w.quad("PaintingBranchB", "bark", {-0.91, 2.66, -2.49}, {-0.30, 2.76, -2.49}, {-0.33, 2.82, -2.47}, {-0.94, 2.72, -2.47});
+    for (int i = 0; i < 22; ++i) {
+        double x = -1.95 + 0.18 * (i % 12);
+        double y = 2.46 + 0.055 * (i % 5) + 0.10 * (i / 12);
+        w.ellipseSurface("PaintingBlossom", "blossom", {x, y, -2.47}, 0.035, 0.030, -2.43, 8);
+    }
+    for (int i = 0; i < 16; ++i) {
+        double x = -0.58 + 0.12 * (i % 8);
+        double y = 2.48 + 0.065 * (i % 5);
+        w.ellipseSurface("PaintingBlossomWarm", "blossom", {x, y, -2.47}, 0.040, 0.032, -2.43, 8);
+    }
+    w.quad("HighPaintingBlue", "painting_blue", {-3.82, 2.55, -2.38}, {-2.20, 2.55, -2.38}, {-2.20, 3.02, -2.38}, {-3.82, 3.02, -2.38});
+    w.quad("HighPaintingGreen", "painting_green", {-2.20, 2.55, -2.38}, {-1.00, 2.55, -2.38}, {-1.00, 3.02, -2.38}, {-2.20, 3.02, -2.38});
+    w.quad("HighPaintingYellow", "painting_yellow", {-1.00, 2.55, -2.38}, {-0.18, 2.55, -2.38}, {-0.18, 3.02, -2.38}, {-1.00, 3.02, -2.38});
+    w.quad("HighPaintingRed", "painting_red", {-0.18, 2.55, -2.38}, {0.44, 2.55, -2.38}, {0.44, 3.02, -2.38}, {-0.18, 3.02, -2.38});
+    w.box("HighPaintingTrunk", "bark", {-0.90, 2.52, -2.34}, {-0.80, 3.03, -2.28});
+    for (int i = 0; i < 18; ++i) {
+        double x = -1.62 + 0.14 * (i % 12);
+        double y = 2.70 + 0.06 * (i % 4);
+        w.ellipseSurface("HighPaintingBlossom", "blossom", {x, y, -2.34}, 0.035, 0.030, -2.27, 8);
+    }
+    w.quad("VisibleLeftPaintingBlue", "painting_blue", {-4.35, 2.34, -2.18}, {-3.30, 2.34, -2.18}, {-3.30, 2.88, -2.18}, {-4.35, 2.88, -2.18});
+    w.quad("VisibleLeftPaintingGreen", "painting_green", {-3.30, 2.34, -2.18}, {-2.35, 2.34, -2.18}, {-2.35, 2.88, -2.18}, {-3.30, 2.88, -2.18});
+    w.quad("VisibleLeftPaintingGold", "painting_yellow", {-2.35, 2.34, -2.18}, {-1.42, 2.34, -2.18}, {-1.42, 2.88, -2.18}, {-2.35, 2.88, -2.18});
+    w.quad("VisibleLeftPaintingTrunk", "bark", {-2.05, 2.36, -2.12}, {-1.86, 2.36, -2.12}, {-1.66, 2.88, -2.12}, {-1.84, 2.88, -2.12});
+    for (int i = 0; i < 26; ++i) {
+        double x = -3.55 + 0.15 * (i % 12);
+        double y = 2.52 + 0.065 * (i % 5);
+        w.ellipseSurface("VisibleLeftPaintingBlossom", "blossom", {x, y, -2.12}, 0.034, 0.030, -2.06, 8);
+    }
+
+    w.box("WindowOuterLeft", "matte_black", {1.10, 0.35, -2.42}, {1.26, 3.05, -2.18});
+    w.box("WindowOuterRight", "matte_black", {4.18, 0.35, -2.42}, {4.36, 3.05, -2.18});
+    w.box("WindowOuterTop", "matte_black", {1.10, 2.88, -2.42}, {4.36, 3.05, -2.18});
+    w.box("WindowOuterBottom", "matte_black", {1.10, 0.35, -2.42}, {4.36, 0.52, -2.18});
+    w.quad("WindowWarmGlassA", "glass_warm", {1.26, 0.52, -2.37}, {2.52, 0.52, -2.37}, {2.52, 2.88, -2.37}, {1.26, 2.88, -2.37});
+    w.quad("WindowWarmGlassB", "window_glow", {2.68, 0.52, -2.37}, {4.18, 0.52, -2.37}, {4.18, 2.88, -2.37}, {2.68, 2.88, -2.37});
+    w.box("WindowCenterBar", "matte_black", {2.52, 0.40, -2.30}, {2.68, 3.05, -2.08});
+    w.box("WindowRightBar", "matte_black", {3.78, 0.52, -2.30}, {3.92, 2.88, -2.08});
     for (int i = 0; i < 5; ++i) {
-        double y0 = 0.72 + i * 0.40;
-        w.box("LeftCurtainFold", "curtain_dark", {1.83, y0, -2.32}, {2.12, y0 + 0.045, -2.20});
-        w.box("RightCurtainFold", "curtain_dark", {3.68, y0, -2.32}, {3.97, y0 + 0.045, -2.20});
+        double y = 0.78 + i * 0.34;
+        w.box("WindowRightMullion", "matte_black", {2.86, y, -2.28}, {4.10, y + 0.055, -2.06});
     }
-    w.box("CurtainRod", "brass", {1.72, 2.80, -2.30}, {4.08, 2.90, -2.18});
-    w.box("WindowFrameLeft", "matte_black", {2.15, 0.85, -2.72}, {2.25, 2.65, -2.60});
-    w.box("WindowFrameRight", "matte_black", {3.55, 0.85, -2.72}, {3.65, 2.65, -2.60});
-    w.box("WindowFrameTop", "matte_black", {2.15, 2.55, -2.72}, {3.65, 2.65, -2.60});
-    w.box("WindowFrameBottom", "matte_black", {2.15, 0.85, -2.72}, {3.65, 0.95, -2.60});
-    w.box("WindowMullionVertical", "matte_black", {2.86, 0.90, -2.70}, {2.94, 2.60, -2.56});
-    w.box("WindowMullionHorizontal", "matte_black", {2.20, 1.70, -2.70}, {3.60, 1.78, -2.56});
-    w.quad("WarmWindowGlow", "painting_orange", {2.25, 0.95, -2.68}, {3.55, 0.95, -2.68}, {3.55, 2.55, -2.68}, {2.25, 2.55, -2.68});
-
-    w.box("BookcaseBody", "table_dark", {-3.95, 0.55, -2.50}, {-2.25, 1.48, -2.08});
-    w.box("BookcaseTop", "table", {-4.02, 1.46, -2.55}, {-2.18, 1.58, -2.02});
-    for (int i = 0; i < 3; ++i) {
-        double x = -3.78 + i * 0.48;
-        w.box("BookRed", "book_red", {x, 0.72, -2.02}, {x + 0.12, 1.26, -1.88});
-        w.box("BookBlue", "book_blue", {x + 0.14, 0.72, -2.02}, {x + 0.25, 1.18, -1.88});
-        w.box("BookGreen", "book_green", {x + 0.27, 0.72, -2.02}, {x + 0.39, 1.34, -1.88});
+    w.quad("WarmInteriorGlow", "window_glow", {2.85, 0.55, -2.65}, {4.18, 0.55, -2.65}, {4.18, 2.85, -2.65}, {2.85, 2.85, -2.65});
+    w.box("InteriorColumn", "matte_black", {2.95, 0.55, -2.02}, {3.10, 2.35, -1.80});
+    w.box("InteriorColumnCap", "matte_black", {2.82, 2.28, -2.02}, {3.23, 2.43, -1.78});
+    w.box("InteriorRailingBase", "bark", {1.50, 0.92, -2.03}, {3.00, 1.02, -1.82});
+    w.quad("InteriorStairRailA", "bark", {1.40, 1.00, -1.92}, {2.62, 1.70, -1.92}, {2.58, 1.79, -1.86}, {1.36, 1.09, -1.86});
+    w.quad("InteriorStairRailB", "bark", {1.55, 0.72, -1.91}, {2.82, 1.44, -1.91}, {2.78, 1.52, -1.85}, {1.51, 0.80, -1.85});
+    for (int i = 0; i < 4; ++i) {
+        double x = 1.65 + i * 0.32;
+        w.box("RailingSpindle", "bark", {x, 0.88, -1.92}, {x + 0.045, 1.45, -1.82});
     }
-    w.ellipseSurface("CeramicVaseBody", "ceramic", {-2.48, 1.03, -1.86}, 0.16, 0.28, -1.84, 18);
-    w.box("PlantStem", "leaf", {-2.50, 1.25, -1.82}, {-2.46, 1.68, -1.78});
-    w.quad("PlantLeafLeft", "leaf", {-2.48, 1.42, -1.80}, {-2.83, 1.60, -1.76}, {-2.78, 1.72, -1.74}, {-2.48, 1.54, -1.79});
-    w.quad("PlantLeafRight", "leaf", {-2.48, 1.43, -1.80}, {-2.13, 1.61, -1.76}, {-2.18, 1.73, -1.74}, {-2.48, 1.55, -1.79});
-
-    w.box("TableLampStem", "brass", {2.78, 0.73, 1.20}, {2.86, 1.34, 1.28});
-    w.box("TableLampBase", "brass", {2.58, 0.72, 1.05}, {3.06, 0.82, 1.43});
-    w.box("TableLampShade", "lamp_shade", {2.45, 1.27, 0.98}, {3.18, 1.60, 1.50});
-    w.box("BookStackA", "book_blue", {-3.00, 0.73, 1.15}, {-2.30, 0.83, 1.55});
-    w.box("BookStackB", "book_red", {-2.92, 0.84, 1.20}, {-2.20, 0.93, 1.62});
-    w.ellipseSurface("SmallVaseFront", "ceramic", {-2.05, 1.00, 1.28}, 0.13, 0.25, 1.30, 18);
-    w.quad("SmallVaseLeafA", "leaf", {-2.05, 1.22, 1.30}, {-2.32, 1.44, 1.34}, {-2.27, 1.55, 1.36}, {-2.03, 1.34, 1.31});
-    w.quad("SmallVaseLeafB", "leaf", {-2.05, 1.24, 1.30}, {-1.77, 1.45, 1.34}, {-1.82, 1.56, 1.36}, {-2.04, 1.35, 1.31});
+    w.box("RightDarkDrape", "matte_black", {4.05, 0.40, -1.95}, {4.45, 3.00, -1.65});
+    w.quad("StoneWallReflectionPlane", "stone", {-1.10, 0.86, -2.50}, {1.10, 0.86, -2.50}, {1.10, 1.80, -2.50}, {-1.10, 1.80, -2.50});
+    for (int r = 0; r < 5; ++r) {
+        for (int c = 0; c < 5; ++c) {
+            double x0 = -1.08 + c * 0.44 + 0.05 * (r % 2);
+            double y0 = 0.92 + r * 0.18;
+            w.box("StoneJoint", "dark_wall", {x0, y0, -2.43}, {x0 + 0.36, y0 + 0.035, -2.36});
+        }
+    }
 
     w.box("MirrorBackPlate", "matte_black", {-1.32, 0.72, 0.84}, {1.32, 2.24, 0.90});
     w.quad("TableMirrorSurface", "mirror", {-1.08, 0.91, 0.915}, {1.08, 0.91, 0.915},
