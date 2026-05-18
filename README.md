@@ -7,6 +7,11 @@ College 2018 Rendering Competition entry for the theme "Something seems a
 little off". The chess pieces are imported from the downloaded TurboSquid "Free
 Stuff 1 - Chess Set" OBJ assets.
 
+The final scene intentionally makes the reflection inconsistent: the right-side
+queen visible in the room is replaced by a king in the mirror. This is
+implemented with camera-only and reflection-only mesh visibility rather than a
+post-process image trick.
+
 ## Build
 
 ```bash

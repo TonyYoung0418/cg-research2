@@ -227,7 +227,8 @@ void writeSceneObj(const BuildOptions &opt) {
     place("GEO_WhiteKnight_02.obj", "VisibleWhiteKnight", "white_piece", {-0.60, 0.73, 2.42}, -0.25, 6.8);
     place("GEO_WhiteBishop_02.obj", "VisibleWhiteBishop", "white_piece", {-0.22, 0.73, 2.50}, 0.0, 7.0);
     place("GEO_WhiteKing.obj", "VisibleWhiteKing", "white_piece", {0.20, 0.73, 2.47}, 0.0, 7.8);
-    place("GEO_WhiteQueen.obj", "VisibleWhiteQueen", "white_piece", {0.66, 0.73, 2.40}, 0.0, 7.1);
+    place("GEO_WhiteQueen.obj", "CameraOnlyWhiteQueen", "white_piece", {0.78, 0.73, 2.34}, 0.0, 7.1);
+    place("GEO_WhiteKing.obj", "ReflectionOnlyWhiteKing", "white_piece", {0.78, 0.73, 2.34}, 0.0, 7.5);
 }
 
 } // namespace scene_builder

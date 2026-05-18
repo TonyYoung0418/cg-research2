@@ -18,6 +18,11 @@
 
 constexpr double kPi = 3.14159265358979323846;
 constexpr double kInf = std::numeric_limits<double>::infinity();
+constexpr int kPrimaryRay = 0;
+constexpr int kMirrorRay = 1;
+constexpr int kVisibleToAll = 0;
+constexpr int kCameraOnly = 1;
+constexpr int kReflectionOnly = 2;
 
 struct Vec3 {
     double x = 0.0, y = 0.0, z = 0.0;
@@ -58,6 +63,7 @@ Vec3 maxVec(const Vec3 &a, const Vec3 &b) {
 struct Ray {
     Vec3 origin;
     Vec3 direction;
+    int visibility = kPrimaryRay;
     Vec3 at(double t) const { return origin + t * direction; }
 };
 
@@ -125,6 +131,7 @@ struct Triangle {
     Vec3 bmin, bmax;
     double area = 0.0;
     int material = 0;
+    int visibility = kVisibleToAll;
     std::string object;
 };
 
@@ -319,6 +326,19 @@ Vec3 rotateY(const Vec3 &p, const Vec3 &center, double radians) {
     return {center.x + c * q.x + s * q.z, center.y + q.y, center.z - s * q.x + c * q.z};
 }
 
+int objectVisibility(const std::string &object) {
+    if (object.rfind("CameraOnly", 0) == 0) return kCameraOnly;
+    if (object.rfind("ReflectionOnly", 0) == 0) return kReflectionOnly;
+    return kVisibleToAll;
+}
+
+bool canRaySee(const Ray &ray, const Triangle &tri) {
+    if (tri.visibility == kVisibleToAll) return true;
+    if (tri.visibility == kCameraOnly) return ray.visibility == kPrimaryRay;
+    if (tri.visibility == kReflectionOnly) return ray.visibility == kMirrorRay;
+    return true;
+}
+
 std::vector<Triangle> loadObj(const Options &opt, const std::map<std::string, int> &matIds) {
     std::ifstream in(opt.objPath);
     if (!in) {
@@ -352,6 +372,7 @@ std::vector<Triangle> loadObj(const Options &opt, const std::map<std::string, in
                 t.v1 = verts[ids[i]];
                 t.v2 = verts[ids[i + 1]];
                 t.object = currentObj;
+                t.visibility = objectVisibility(currentObj);
                 auto it = matIds.find(currentMat);
                 t.material = it == matIds.end() ? 0 : it->second;
                 finalizeTriangle(t);
@@ -363,7 +384,9 @@ std::vector<Triangle> loadObj(const Options &opt, const std::map<std::string, in
     Vec3 transformCenter{0.0, 1.0, 1.75};
     double radians = opt.objectRotateY * kPi / 180.0;
     for (auto &t : tris) {
-        bool movable = t.object.rfind("Visible", 0) == 0 || t.object.rfind("Mirror", 0) == 0;
+        bool movable = t.object.rfind("Visible", 0) == 0 ||
+                       t.object.rfind("CameraOnly", 0) == 0 ||
+                       t.object.rfind("ReflectionOnly", 0) == 0;
         if (movable) {
             t.v0 = rotateY(t.v0, transformCenter, radians) + opt.objectOffset;
             t.v1 = rotateY(t.v1, transformCenter, radians) + opt.objectOffset;
@@ -443,6 +466,7 @@ struct Scene {
     }
 
     bool hitTri(const Triangle &tri, const Ray &r, double tMin, double tMax, Hit &hit) const {
+        if (!canRaySee(r, tri)) return false;
         Vec3 e1 = tri.v1 - tri.v0;
         Vec3 e2 = tri.v2 - tri.v0;
         Vec3 pvec = cross(r.direction, e2);
@@ -525,7 +549,7 @@ struct Scene {
         return color;
     }
 
-    Vec3 sampleDirect(const Hit &hit, const Material &mat, Rng &rng) const {
+    Vec3 sampleDirect(const Hit &hit, const Material &mat, int visibility, Rng &rng) const {
         if (lightTris.empty() || mat.type == 2 || mat.type == 3) return {0, 0, 0};
         Vec3 result{0, 0, 0};
         Vec3 brdf = mat.albedo / kPi;
@@ -545,7 +569,7 @@ struct Scene {
             bool visible = true;
             if (opt.shadows) {
                 Hit shadowHit;
-                Ray shadowRay{hit.p + 1e-4 * hit.normal, wi};
+                Ray shadowRay{hit.p + 1e-4 * hit.normal, wi, visibility};
                 visible = !intersect(shadowRay, 1e-4, dist - 2e-4, shadowHit);
             }
             if (visible) {
@@ -559,13 +583,14 @@ struct Scene {
     bool scatter(const Ray &ray, const Hit &hit, const Material &mat, Rng &rng, Vec3 &atten, Ray &scattered) const {
         if (mat.type == 0) {
             Vec3 dir = cosineHemisphere(hit.normal, rng);
-            scattered = {hit.p + 1e-4 * hit.normal, dir};
+            scattered = {hit.p + 1e-4 * hit.normal, dir, ray.visibility};
             atten = mat.albedo;
             return true;
         }
         if (mat.type == 1) {
             Vec3 dir = normalize(reflect(normalize(ray.direction), hit.normal) + mat.roughness * randomInUnitSphere(rng));
-            scattered = {hit.p + 1e-4 * hit.normal, dir};
+            int visibility = mat.name == "mirror" ? kMirrorRay : ray.visibility;
+            scattered = {hit.p + 1e-4 * hit.normal, dir, visibility};
             atten = mat.albedo;
             return dot(scattered.direction, hit.normal) > 0.0;
         }
@@ -583,7 +608,7 @@ struct Scene {
                 refract(unitDir, hit.normal, refractionRatio, dir);
             }
             Vec3 offsetNormal = dot(dir, hit.normal) > 0.0 ? hit.normal : -hit.normal;
-            scattered = {hit.p + 1e-4 * offsetNormal, normalize(dir)};
+            scattered = {hit.p + 1e-4 * offsetNormal, normalize(dir), ray.visibility};
             return true;
         }
         return false;
@@ -606,7 +631,7 @@ struct Scene {
                 if (depth == 0) radiance += throughput * mat.emission;
                 break;
             }
-            radiance += throughput * sampleDirect(hit, mat, rng);
+            radiance += throughput * sampleDirect(hit, mat, ray.visibility, rng);
             Ray scattered;
             Vec3 atten;
             if (!scatter(ray, hit, mat, rng, atten, scattered)) break;
