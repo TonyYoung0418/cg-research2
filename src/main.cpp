@@ -260,12 +260,12 @@ struct Options {
     std::string environment = "studio";
     Vec3 camera{-0.25, 0.96, 5.90};
     Vec3 lookAt{-0.05, 0.50, 2.35};
-    Vec3 lightPos{0.00, 3.45, 1.80};
+    Vec3 lightPos{0.00, 3.45, 2.40};
     Vec3 objectOffset{0.0, 0.0, 0.0};
     Vec3 floorColor{0.43, 0.27, 0.16};
     double objectRotateY = 0.0;
     double fov = 52.0;
-    double lightSize = 2.20;
+    double lightSize = 1.60;
     double metalRoughness = 0.12;
 };
 
@@ -283,9 +283,9 @@ void applyPreset(Options &opt) {
         opt.lookAt = {-0.05, 0.48, 2.20};
         opt.fov = 60.0;
     } else {
-        opt.camera = {-0.25, 0.96, 5.90};
-        opt.lookAt = {-0.05, 0.50, 2.35};
-        opt.fov = 56.0;
+        opt.camera = {-0.10, 1.06, 6.45};
+        opt.lookAt = {-0.05, 0.48, 2.20};
+        opt.fov = 60.0;
     }
 }
 

@@ -12,11 +12,11 @@ queen visible in the room is replaced by a king in the mirror, and the left-side
 knight is replaced by a bishop. This is implemented with camera-only and
 reflection-only mesh visibility rather than a post-process image trick.
 
-The room background is procedurally modeled after an online abandoned-house
-reference: rough plaster, old wood boards, a worn door, fireplace damage,
-cracks, dust, and loose debris. It is built from geometry and materials rather
-than using the reference photo as an image background; the window elements from
-the reference are intentionally omitted.
+The room is built from procedural shell geometry plus a filtered furniture-only
+import from `57-estancia_comedor_obj/room.obj`. The importer keeps interior
+furniture while dropping walls, windows, window frames, and outdoor backdrop
+elements. The final composition is arranged for a living-room style mirror
+study rather than a full photo-matched reconstruction.
 
 The floor uses a CC0 old wood floor diffuse texture from Poly Haven, converted
 to a local PPM file and sampled by the renderer as a repeating material map.
@@ -32,6 +32,11 @@ scene inputs and are cited here for report traceability:
   Competition entry for the theme "Something seems a little off".
 - Chess meshes: TurboSquid "Free Stuff 1 - Chess Set" OBJ assets, imported as
   mesh geometry and assigned materials by the local scene builder.
+- Room furniture source mesh: `57-estancia_comedor_obj/room.obj`, filtered by
+  the local scene builder to keep only selected indoor furniture. This original
+  OBJ is kept as a local asset because it is larger than GitHub's normal single
+  file limit; the generated scene OBJ used for the submitted renders is included
+  in `scenes/generated_scene.obj`.
 - Floor texture: Poly Haven "Old Wood Floor" diffuse texture
   (`https://polyhaven.com/a/old_wood_floor`), CC0, converted to
   `textures/old_wood_floor.ppm` and sampled by the renderer as a repeating
@@ -48,11 +53,12 @@ cmake -S . -B build
 cmake --build build
 ```
 
-## Render the required two viewpoints
+## Render the current viewpoints
 
 ```bash
 ./build/MirrorReflectionRenderer --preset main --width 1024 --height 768 --spp 160 --output renders/view_main.ppm
 ./build/MirrorReflectionRenderer --preset side --width 800 --height 600 --spp 64 --output renders/view_side.ppm
+./build/MirrorReflectionRenderer --camera 4.95 1.15 -2.55 --look-at 0.05 0.95 2.10 --fov 58 --width 800 --height 600 --spp 64 --output renders/view_door.ppm
 ```
 
 For fast previews:
@@ -73,9 +79,15 @@ For fast previews:
 The renderer writes `scenes/generated_scene.obj` and `scenes/generated_scene.mtl`
 on every run, then renders from the loaded OBJ geometry.
 
+Note: rerendering from source requires the local `57-estancia_comedor_obj`
+folder to be present beside the executable working directory. The generated OBJ
+scene and current PNG/PPM outputs are committed for reproducibility of the final
+submission state.
+
 ## Prepared files
 
 - `renders/view_main.png`: generated 1024x768 main result image.
 - `renders/view_side.png`: generated 800x600 side-view result image.
+- `renders/view_door.png`: generated 800x600 view from the doorway.
 - `Free_Stuff_1_-__Chess_Set/OBJ/`: the subset of the downloaded chess OBJ
   assets used by the scene builder.

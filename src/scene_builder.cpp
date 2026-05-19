@@ -1,6 +1,7 @@
 #include "scene_builder.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <cmath>
 #include <fstream>
@@ -19,6 +20,125 @@ struct Vec3 {
     double y = 0.0;
     double z = 0.0;
 };
+
+std::string lowerCopy(std::string s) {
+    for (char &c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return s;
+}
+
+bool startsWith(const std::string &text, const std::string &prefix) {
+    return text.rfind(prefix, 0) == 0;
+}
+
+std::string safeObjectName(const std::string &name) {
+    std::string out;
+    out.reserve(name.size());
+    for (unsigned char c : name) {
+        if (std::isalnum(c)) out.push_back(static_cast<char>(c));
+        else out.push_back('_');
+    }
+    return out.empty() ? "Object" : out;
+}
+
+bool isRoomFurnitureObject(const std::string &name) {
+    std::string n = lowerCopy(name);
+    if (n.empty()) return false;
+
+    // Keep the borrowed room as furniture only: no walls, floor, ceiling,
+    // windows/window frames, or the large outdoor/window backdrop plane.
+    if (n.find("muro") != std::string::npos) return false;
+    if (n == "piso" || n == "techo" || n == "plane001") return false;
+    if (n.find("ventana") != std::string::npos) return false;
+    if (n.find("carp") != std::string::npos) return false;
+    if (startsWith(n, "rama")) return false;
+    if (startsWith(n, "shelf")) return false;
+    if (n.find("picture") != std::string::npos) return false;
+    if (startsWith(n, "book")) return false;
+    if (startsWith(n, "decor")) return false;
+    if (startsWith(n, "vase")) return false;
+    if (startsWith(n, "leaf")) return false;
+    if (startsWith(n, "succulent")) return false;
+    if (n.find("asket") != std::string::npos) return false;
+    if (n.find("carafe") != std::string::npos || n.find("goods_pure_carafe_set") != std::string::npos) return false;
+
+    return true;
+}
+
+bool isSofaObject(int serial) {
+    return serial >= 24 && serial <= 34;
+}
+
+bool isSmallCabinetObject(int serial) {
+    return serial == 35 || serial == 36;
+}
+
+bool isLoungeChairObject(int serial) {
+    return serial >= 187 && serial <= 197;
+}
+
+bool isCoffeeTableObject(int serial) {
+    return (serial >= 70 && serial <= 75) || (serial >= 200 && serial <= 229) || (serial >= 231 && serial <= 237);
+}
+
+bool isKeptDiningChairObject(int serial) {
+    return serial == 95 || serial == 96;
+}
+
+bool isRemovedDiningSetObject(int serial) {
+    if (serial >= 100 && serial <= 186) return true;
+    if (serial >= 76 && serial <= 96 && !isKeptDiningChairObject(serial)) return true;
+    return false;
+}
+
+struct RoomImportPolicy {
+    bool include = false;
+    std::string visibilityPrefix;
+    Vec3 offset;
+};
+
+RoomImportPolicy roomImportPolicy(int serial, const std::string &name, bool reflectionLoungeCopy) {
+    if (!isRoomFurnitureObject(name)) return {};
+
+    if (reflectionLoungeCopy) {
+        if (!isLoungeChairObject(serial)) return {};
+        return {true, "ReflectionOnly", {-1.35, 0.0, 0.06}};
+    }
+
+    if (isSmallCabinetObject(serial) || isRemovedDiningSetObject(serial)) return {};
+    if (isSofaObject(serial)) return {true, "CameraOnly", {0.25, 0.0, 0.0}};
+    if (isCoffeeTableObject(serial)) return {true, "", {0.85, 0.0, 0.0}};
+    if (isLoungeChairObject(serial)) return {true, "", {1.25, 0.0, 0.0}};
+    return {true, "", {0.0, 0.0, 0.0}};
+}
+
+std::string roomFurnitureMaterial(const std::string &name) {
+    std::string n = lowerCopy(name);
+    if (startsWith(n, "book")) return "book_red";
+    if (n.find("shelf") != std::string::npos || n.find("basket") != std::string::npos) return "old_wood_dark";
+    if (n.find("carpet") != std::string::npos) return "rug";
+    if (n.find("vase") != std::string::npos || n.find("decor") != std::string::npos ||
+        n.find("picture") != std::string::npos) {
+        return "ceramic";
+    }
+    if (n.find("succulent") != std::string::npos || startsWith(n, "leaf")) return "leaf";
+    if (n.find("cylinder") != std::string::npos || n.find("screw") != std::string::npos) return "metal";
+    return "old_wood";
+}
+
+int parseObjIndex(const std::string &tok, size_t count) {
+    size_t slash = tok.find('/');
+    int id = std::stoi(slash == std::string::npos ? tok : tok.substr(0, slash));
+    return id < 0 ? int(count) + id : id;
+}
+
+int parseObjNormalIndex(const std::string &tok, size_t count) {
+    size_t slash = tok.find('/');
+    if (slash == std::string::npos) return 0;
+    size_t slash2 = tok.find('/', slash + 1);
+    if (slash2 == std::string::npos || slash2 + 1 >= tok.size()) return 0;
+    int id = std::stoi(tok.substr(slash2 + 1));
+    return id < 0 ? int(count) + id : id;
+}
 
 class ObjWriter {
 public:
@@ -196,6 +316,123 @@ public:
         }
     }
 
+    void roomFurniturePass(const std::string &path, bool reflectionLoungeCopy) {
+        std::ifstream first(path);
+        if (!first) {
+            std::cerr << "Could not open room asset " << path << "\n";
+            std::exit(1);
+        }
+
+        std::vector<Vec3> verts(1);
+        std::vector<Vec3> norms(1);
+        std::vector<unsigned char> usedVerts(1, 0);
+        std::vector<unsigned char> usedNorms(1, 0);
+        std::string currentObject;
+        std::string line;
+        int objectSerial = 0;
+
+        while (std::getline(first, line)) {
+            std::istringstream ss(line);
+            std::string tag;
+            ss >> tag;
+            if (tag == "v") {
+                Vec3 p;
+                ss >> p.x >> p.y >> p.z;
+                verts.push_back(p);
+                usedVerts.push_back(0);
+            } else if (tag == "vn") {
+                Vec3 n;
+                ss >> n.x >> n.y >> n.z;
+                norms.push_back(n);
+                usedNorms.push_back(0);
+            } else if (tag == "o") {
+                ss >> currentObject;
+                ++objectSerial;
+            } else if (tag == "f" && roomImportPolicy(objectSerial, currentObject, reflectionLoungeCopy).include) {
+                std::string tok;
+                while (ss >> tok) {
+                    int vi = parseObjIndex(tok, verts.size());
+                    int ni = parseObjNormalIndex(tok, norms.size());
+                    if (vi > 0 && vi < int(usedVerts.size())) usedVerts[size_t(vi)] = 1;
+                    if (ni > 0 && ni < int(usedNorms.size())) usedNorms[size_t(ni)] = 1;
+                }
+            }
+        }
+
+        constexpr double s = 0.008;
+        auto transform = [&](Vec3 p, const Vec3 &offset) {
+            return Vec3{
+                0.25 + (p.x - 696.0) * s + offset.x,
+                0.02 + p.y * s + offset.y,
+                4.35 + (p.z + 796.0) * s + offset.z
+            };
+        };
+
+        std::vector<int> remap(verts.size(), 0);
+        std::vector<int> normalRemap(norms.size(), 0);
+        for (size_t i = 1; i < norms.size(); ++i) {
+            if (usedNorms[i]) normalRemap[i] = normal(norms[i]);
+        }
+
+        std::ifstream second(path);
+        if (!second) {
+            std::cerr << "Could not reopen room asset " << path << "\n";
+            std::exit(1);
+        }
+
+        currentObject.clear();
+        std::string emittedObject;
+        objectSerial = 0;
+        while (std::getline(second, line)) {
+            std::istringstream ss(line);
+            std::string tag;
+            ss >> tag;
+            if (tag == "o") {
+                ss >> currentObject;
+                emittedObject.clear();
+                ++objectSerial;
+            } else if (tag == "f") {
+                RoomImportPolicy policy = roomImportPolicy(objectSerial, currentObject, reflectionLoungeCopy);
+                if (!policy.include) continue;
+                if (emittedObject != currentObject) {
+                    obj << "o " << policy.visibilityPrefix << "ImportedRoomFurniture_" << objectSerial
+                        << "_" << safeObjectName(currentObject)
+                        << "\nusemtl " << roomFurnitureMaterial(currentObject) << "\n";
+                    emittedObject = currentObject;
+                }
+                std::vector<int> ids;
+                std::vector<int> nids;
+                std::string tok;
+                while (ss >> tok) {
+                    ids.push_back(parseObjIndex(tok, verts.size()));
+                    nids.push_back(parseObjNormalIndex(tok, norms.size()));
+                }
+                for (size_t i = 1; i + 1 < ids.size(); ++i) {
+                    if (remap[size_t(ids[0])] == 0) remap[size_t(ids[0])] = vertex(transform(verts[size_t(ids[0])], policy.offset));
+                    if (remap[size_t(ids[i])] == 0) remap[size_t(ids[i])] = vertex(transform(verts[size_t(ids[i])], policy.offset));
+                    if (remap[size_t(ids[i + 1])] == 0) remap[size_t(ids[i + 1])] = vertex(transform(verts[size_t(ids[i + 1])], policy.offset));
+                    int a = remap[size_t(ids[0])];
+                    int b = remap[size_t(ids[i])];
+                    int c = remap[size_t(ids[i + 1])];
+                    int na = nids[0] > 0 ? normalRemap[size_t(nids[0])] : 0;
+                    int nb = nids[i] > 0 ? normalRemap[size_t(nids[i])] : 0;
+                    int nc = nids[i + 1] > 0 ? normalRemap[size_t(nids[i + 1])] : 0;
+                    if (a <= 0 || b <= 0 || c <= 0) continue;
+                    if (na > 0 && nb > 0 && nc > 0) {
+                        obj << "f " << a << "//" << na << " " << b << "//" << nb << " " << c << "//" << nc << "\n";
+                    } else {
+                        obj << "f " << a << " " << b << " " << c << "\n";
+                    }
+                }
+            }
+        }
+    }
+
+    void roomFurniture(const std::string &path) {
+        roomFurniturePass(path, false);
+        roomFurniturePass(path, true);
+    }
+
     std::ofstream obj;
 
 private:
@@ -253,8 +490,8 @@ void writeMtl(const BuildOptions &opt) {
     mat("old_wood_light", {0.60, 0.30, 0.11});
     mat("dust", {0.18, 0.14, 0.10});
     mat("shadow_hole", {0.018, 0.014, 0.011});
-    mat("light_panel", {1, 1, 1}, {18.0, 14.0, 10.0});
-    mat("light_fill", {1, 1, 1}, {10.0, 8.0, 6.0});
+    mat("light_panel", {1, 1, 1}, {95.0, 74.0, 52.0});
+    mat("light_fill", {1, 1, 1}, {58.0, 46.0, 34.0});
 }
 
 } // namespace
@@ -268,12 +505,15 @@ void writeSceneObj(const BuildOptions &opt) {
     w.quad("BackWall", "wall", {5.8, 0.0, -3.35}, {-5.8, 0.0, -3.35}, {-5.8, 3.5, -3.35}, {5.8, 3.5, -3.35});
     w.quad("LeftWall", "dark_wall", {-5.8, 0.0, 7.2}, {-5.8, 0.0, -3.35}, {-5.8, 3.5, -3.35}, {-5.8, 3.5, 7.2});
     w.quad("RightWall", "wall", {5.8, 0.0, -3.35}, {5.8, 0.0, 7.2}, {5.8, 3.5, 7.2}, {5.8, 3.5, -3.35});
+    w.quad("FrontWall", "wall", {-5.8, 0.0, 7.2}, {5.8, 0.0, 7.2}, {5.8, 3.5, 7.2}, {-5.8, 3.5, 7.2});
     w.quad("Ceiling", "plaster_light", {-5.8, 3.5, 7.2}, {5.8, 3.5, 7.2}, {5.8, 3.5, -3.35}, {-5.8, 3.5, -3.35});
 
     w.box("BackBaseboard", "trim", {-5.70, 0.02, -3.24}, {5.70, 0.16, -3.08});
+    w.box("FrontBaseboard", "trim", {-5.70, 0.02, 7.04}, {5.70, 0.16, 7.18});
     w.box("RightBaseboard", "trim", {5.62, 0.02, -3.10}, {5.78, 0.16, 7.00});
     w.box("LeftBaseboard", "old_wood_dark", {-5.78, 0.02, -3.10}, {-5.62, 0.16, 7.00});
     w.box("BackCrownMoulding", "trim", {-5.70, 3.26, -3.24}, {5.70, 3.44, -3.08});
+    w.box("FrontCrownMoulding", "trim", {-5.70, 3.26, 7.02}, {5.70, 3.44, 7.18});
 
     w.box("DoorFrameLeft", "old_wood_dark", {3.10, 0.00, -3.06}, {3.30, 2.88, -2.76});
     w.box("DoorFrameRight", "old_wood_dark", {4.42, 0.00, -3.06}, {4.62, 2.88, -2.76});
@@ -288,77 +528,26 @@ void writeSceneObj(const BuildOptions &opt) {
     w.box("MantelShelf", "old_wood", {-5.16, 1.34, -2.98}, {-1.86, 1.48, -2.56});
     w.box("MantelLeftPost", "old_wood_dark", {-4.92, 0.00, -3.00}, {-4.64, 1.30, -2.62});
     w.box("MantelRightPost", "old_wood_dark", {-2.38, 0.00, -3.00}, {-2.10, 1.30, -2.62});
-    w.box("FireplaceShadow", "shadow_hole", {-4.48, 0.00, -2.88}, {-2.58, 1.05, -2.62});
-    w.box("FireplaceRubbleBack", "plaster_shadow", {-4.36, 0.08, -2.58}, {-2.70, 0.98, -2.44});
-    for (int i = 0; i < 8; ++i) {
-        double x = -4.30 + 0.21 * i;
-        w.box("FireplaceBrick", "plaster_raw", {x, 0.12 + 0.10 * (i % 3), -2.44}, {x + 0.14, 0.17 + 0.10 * (i % 3), -2.30});
-    }
-    w.disk("RoundWallHole", "shadow_hole", {-3.10, 1.82, -2.52}, 0.20, 0.17, -2.48, 24);
-
-    w.quad("CeilingStain", "plaster_shadow", {-3.50, 3.45, 4.40}, {1.35, 3.45, 4.05}, {2.45, 3.45, -0.90}, {-2.05, 3.45, -0.55});
-    w.quad("CeilingLightPatch", "plaster_light", {-0.80, 3.445, 3.05}, {4.65, 3.445, 2.82}, {4.70, 3.445, 0.12}, {0.10, 3.445, 0.42});
-    for (int i = 0; i < 20; ++i) {
-        double x = -4.80 + 0.52 * (i % 10);
-        double z = -2.80 + 0.34 * (i / 10) + 0.15 * (i % 3);
-        w.quad("CeilingTrowelMarks", "plaster_raw", {x, 3.435, z}, {x + 0.30, 3.435, z + 0.055},
-               {x + 0.32, 3.435, z + 0.080}, {x + 0.02, 3.435, z + 0.025});
-    }
-
-    for (int i = 0; i < 18; ++i) {
-        double x = -5.20 + 0.58 * (i % 9);
-        double y = 0.62 + 0.22 * (i / 9) + 0.05 * (i % 4);
-        w.quad("BackWallScrape", (i % 3 == 0) ? "plaster_light" : "plaster_raw",
-               {x, y, -3.05}, {x + 0.36, y + 0.06, -3.05}, {x + 0.31, y + 0.12, -3.01}, {x - 0.04, y + 0.04, -3.01});
-    }
-    for (int i = 0; i < 12; ++i) {
-        double x = -5.10 + 0.76 * (i % 6);
-        double y = 1.70 + 0.24 * (i / 6) + 0.04 * (i % 3);
-        w.quad("BackWallCrack", "plaster_shadow", {x, y, -3.03}, {x + 0.38, y + 0.09, -3.03},
-               {x + 0.39, y + 0.11, -3.00}, {x + 0.01, y + 0.02, -3.00});
-    }
-    for (int i = 0; i < 10; ++i) {
-        double x = -5.80;
-        double y = 0.46 + 0.22 * (i % 5);
-        double z = -2.45 + 0.50 * (i / 5);
-        w.quad("LeftWallDamage", (i % 2 == 0) ? "plaster_raw" : "plaster_shadow",
-               {x + 0.08, y, z}, {x + 0.08, y + 0.16, z + 0.05}, {x + 0.08, y + 0.13, z + 0.32}, {x + 0.08, y - 0.02, z + 0.20});
-    }
-    for (int i = 0; i < 14; ++i) {
-        double x = 5.72;
-        double y = 0.36 + 0.17 * (i % 7);
-        double z = -2.20 + 0.54 * (i / 7);
-        w.quad("RightWallPeel", (i % 3 == 0) ? "plaster_light" : "plaster_raw",
-               {x - 0.08, y, z}, {x - 0.08, y + 0.11, z + 0.10}, {x - 0.08, y + 0.10, z + 0.36}, {x - 0.08, y - 0.02, z + 0.28});
-    }
-
-    w.quad("DustPatchNearDoor", "dust", {2.30, 0.018, -2.70}, {4.80, 0.018, -2.70}, {4.45, 0.018, -1.64}, {2.10, 0.018, -1.58});
-    w.quad("DustPatchFireplace", "dust", {-4.80, 0.019, -2.60}, {-1.55, 0.019, -2.68}, {-1.85, 0.019, -1.48}, {-4.45, 0.019, -1.34});
-    for (int i = 0; i < 20; ++i) {
-        double x = -5.00 + 0.48 * (i % 10);
-        double z = -2.35 + 0.28 * (i / 10) + 0.04 * (i % 4);
-        w.box("SmallDebris", (i % 2 == 0) ? "old_wood_dark" : "plaster_raw",
-              {x, 0.02, z}, {x + 0.07 + 0.03 * (i % 3), 0.055, z + 0.035 + 0.02 * (i % 2)});
-    }
-    w.box("LooseBoardA", "old_wood_dark", {-3.85, 0.035, -1.00}, {-1.95, 0.105, -0.82});
-    w.box("LooseBoardB", "old_wood", {2.45, 0.035, -1.04}, {3.90, 0.100, -0.86});
-
-    w.box("MirrorBackPlate", "matte_black", {-0.92, 0.06, 1.10}, {0.92, 1.16, 1.16});
-    w.quad("FloorMirrorSurface", "mirror", {-0.72, 0.22, 1.175}, {0.72, 0.22, 1.175},
-           {0.72, 0.98, 1.175}, {-0.72, 0.98, 1.175});
-    w.box("MirrorFrameLeft", "frame", {-0.92, 0.06, 1.18}, {-0.72, 1.16, 1.28});
-    w.box("MirrorFrameRight", "frame", {0.72, 0.06, 1.18}, {0.92, 1.16, 1.28});
-    w.box("MirrorFrameTop", "frame", {-0.92, 0.98, 1.18}, {0.92, 1.16, 1.28});
-    w.box("MirrorFrameBottom", "frame", {-0.92, 0.06, 1.18}, {0.92, 0.22, 1.28});
+    w.box("MirrorBackPlate", "matte_black", {-2.12, 0.00, 1.04}, {2.12, 1.88, 1.12});
+    w.quad("FloorMirrorSurface", "mirror", {-1.90, 0.10, 1.125}, {1.90, 0.10, 1.125},
+           {1.90, 1.60, 1.125}, {-1.90, 1.60, 1.125});
+    w.box("MirrorFrameLeft", "frame", {-2.12, 0.00, 1.13}, {-2.00, 1.88, 1.22});
+    w.box("MirrorFrameRight", "frame", {2.00, 0.00, 1.13}, {2.12, 1.88, 1.22});
+    w.box("MirrorFrameTop", "frame", {-2.12, 1.60, 1.13}, {2.12, 1.88, 1.22});
+    w.box("MirrorFrameBottom", "frame", {-2.12, 0.00, 1.13}, {2.12, 0.10, 1.22});
 
     double ls = opt.lightSize;
     Vec3 lp{opt.lightPos[0], opt.lightPos[1], opt.lightPos[2]};
     w.quad("MainLight", "light_panel", {lp.x - ls, lp.y, lp.z - 0.35 * ls}, {lp.x + ls, lp.y, lp.z - 0.35 * ls},
            {lp.x + ls, lp.y, lp.z + 0.35 * ls}, {lp.x - ls, lp.y, lp.z + 0.35 * ls});
-    w.quad("FillLight", "light_fill", {-5.20, 2.95, 6.20}, {5.20, 2.95, 6.20}, {5.20, 2.95, 3.55}, {-5.20, 2.95, 3.55});
     if (opt.extraLight) {
-        w.quad("AuxLight", "light_fill", {-5.45, 2.75, 6.20}, {-5.45, 1.35, 6.20}, {-5.45, 1.35, 3.55}, {-5.45, 2.75, 3.55});
+        double fs = ls * 0.8;
+        Vec3 fp{lp.x, lp.y, -1.85};
+        w.quad("FillLight", "light_fill", {fp.x - fs, fp.y, fp.z - 0.30 * fs}, {fp.x + fs, fp.y, fp.z - 0.30 * fs},
+               {fp.x + fs, fp.y, fp.z + 0.30 * fs}, {fp.x - fs, fp.y, fp.z + 0.30 * fs});
     }
+
+    w.roomFurniture("57-estancia_comedor_obj/room.obj");
 
     const std::string assetDir = "Free_Stuff_1_-__Chess_Set/OBJ/";
     auto place = [&](const std::string &file, const std::string &name, const std::string &mat,

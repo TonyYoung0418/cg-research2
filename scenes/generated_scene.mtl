@@ -172,9 +172,9 @@ Ke 0 0 0
 
 newmtl light_panel
 Kd 1 1 1
-Ke 18 14 10
+Ke 95 74 52
 
 newmtl light_fill
 Kd 1 1 1
-Ke 10 8 6
+Ke 58 46 34
 

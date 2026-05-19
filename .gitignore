@@ -1,10 +1,16 @@
 .DS_Store
 build/
+build_roomtmp/
 dist/
 *.o
 *.zip
 *.tar.gz
 Research-Project2-2026-v7.pdf
+
+# Large local source asset. The final generated scene and rendered images are
+# committed, but the original room OBJ is larger than GitHub's normal file
+# limit and should stay local.
+57-estancia_comedor_obj/
 
 # Keep the repository small: the renderer only needs these OBJ chess assets.
 Free_Stuff_1_-__Chess_Set/*
