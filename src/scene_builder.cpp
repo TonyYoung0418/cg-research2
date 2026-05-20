@@ -80,8 +80,13 @@ bool isCoffeeTableObject(int serial) {
     return (serial >= 70 && serial <= 75) || (serial >= 200 && serial <= 229) || (serial >= 231 && serial <= 237);
 }
 
+bool isRemovedLeftChairObject(int serial) {
+    // Exclude every repeated copy of the small chair behind the lounge chair.
+    return serial >= 31 && serial <= 34;
+}
+
 bool isKeptDiningChairObject(int serial) {
-    return serial == 95 || serial == 96;
+    return false;
 }
 
 bool isRemovedDiningSetObject(int serial) {
@@ -104,7 +109,7 @@ RoomImportPolicy roomImportPolicy(int serial, const std::string &name, bool refl
         return {true, "ReflectionOnly", {-1.35, 0.0, 0.06}};
     }
 
-    if (isSmallCabinetObject(serial) || isRemovedDiningSetObject(serial)) return {};
+    if (isSmallCabinetObject(serial) || isRemovedDiningSetObject(serial) || isRemovedLeftChairObject(serial)) return {};
     if (isSofaObject(serial)) return {true, "CameraOnly", {0.25, 0.0, 0.0}};
     if (isCoffeeTableObject(serial)) return {true, "", {0.85, 0.0, 0.0}};
     if (isLoungeChairObject(serial)) return {true, "", {1.25, 0.0, 0.0}};
