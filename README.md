@@ -18,7 +18,7 @@ and Monte Carlo sampling itself.
 
 ## Final Renders
 
-The submitted render set was generated with `spp=768`.
+The submitted render set was generated with `spp=512`.
 
 - `renders/view_main.png`: main view, 1024x768.
 - `renders/view_side.png`: side view, 800x600.
@@ -128,21 +128,21 @@ The executable will be:
 
 ## Reproduce the Final Renders
 
-The final render commands use `spp=768`.
+The final render commands use `spp=512`.
 
 ```bash
 mkdir -p renders
 
-./build/MirrorReflectionRenderer --preset main --width 1024 --height 768 --spp 768 --output renders/view_main.ppm
+./build/MirrorReflectionRenderer --preset main --width 1024 --height 768 --spp 512 --output renders/view_main.ppm
 sips -s format png renders/view_main.ppm --out renders/view_main.png
 
-./build/MirrorReflectionRenderer --preset side --width 800 --height 600 --spp 768 --output renders/view_side.ppm
+./build/MirrorReflectionRenderer --preset side --width 800 --height 600 --spp 512 --output renders/view_side.ppm
 sips -s format png renders/view_side.ppm --out renders/view_side.png
 
-./build/MirrorReflectionRenderer --camera 4.95 1.15 -2.55 --look-at 0.05 0.95 2.10 --fov 58 --width 800 --height 600 --spp 768 --output renders/view_door.ppm
+./build/MirrorReflectionRenderer --camera 4.95 1.15 -2.55 --look-at 0.05 0.95 2.10 --fov 58 --width 800 --height 600 --spp 512 --output renders/view_door.ppm
 sips -s format png renders/view_door.ppm --out renders/view_door.png
 
-./build/MirrorReflectionRenderer --camera 3.85 1.45 5.75 --look-at -0.18 0.62 2.35 --fov 56 --width 800 --height 600 --spp 768 --output renders/view_extra.ppm
+./build/MirrorReflectionRenderer --camera 3.85 1.45 5.75 --look-at -0.18 0.62 2.35 --fov 56 --width 800 --height 600 --spp 512 --output renders/view_extra.ppm
 sips -s format png renders/view_extra.ppm --out renders/view_extra.png
 ```
 
@@ -216,7 +216,7 @@ The current final scene includes:
 - Imported furniture arranged around the mirror.
 - Removed extra dining chairs and unwanted background furniture.
 - A mirror-only object substitution effect.
-- Four high-sample final renders at `spp=768`.
+- Four high-sample final renders at `spp=512`.
 
 The generated scene, final renders, renderer source code, texture, and required
 chess assets are included in the repository. The large original room OBJ source
