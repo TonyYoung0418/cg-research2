@@ -34,28 +34,68 @@ newmtl rug_border
 Kd 0.7 0.5 0.28
 Ke 0 0 0
 
-newmtl table
-Kd 0.32 0.16 0.065
+newmtl table_top
+Kd 0.46 0.27 0.12
 Ke 0 0 0
 
-newmtl table_dark
-Kd 0.075 0.042 0.024
+newmtl table_base
+Kd 0.22 0.12 0.055
+Ke 0 0 0
+
+newmtl tabletop_light
+Kd 0.72 0.56 0.34
+Ke 0 0 0
+
+newmtl tabletop_vessel
+Kd 0.8 0.75 0.68
+Ke 0 0 0
+
+newmtl tabletop_reed
+Kd 0.26 0.17 0.09
+Ke 0 0 0
+
+newmtl tabletop_cup_white
+Kd 0.91 0.89 0.85
+Ke 0 0 0
+
+newmtl tabletop_cup_gold
+Kd 0.62 0.42 0.18
+Ke 0 0 0
+
+newmtl tabletop_book
+Kd 0.97 0.97 0.97
 Ke 0 0 0
 
 newmtl wood_light
 Kd 0.63 0.33 0.15
 Ke 0 0 0
 
-newmtl wood_glow
-Kd 0.82 0.52 0.27
-Ke 0 0 0
-
 newmtl frame
-Kd 0.9 0.62 0.24
+Kd 0.62 0.42 0.18
 Ke 0 0 0
 
 newmtl brass
 Kd 0.8 0.57 0.22
+Ke 0 0 0
+
+newmtl sofa_body
+Kd 0.46 0.29 0.16
+Ke 0 0 0
+
+newmtl sofa_cushion
+Kd 0.62 0.45 0.28
+Ke 0 0 0
+
+newmtl sofa_pillow
+Kd 0.67 0.58 0.45
+Ke 0 0 0
+
+newmtl chair_frame
+Kd 0.57 0.36 0.18
+Ke 0 0 0
+
+newmtl chair_cushion
+Kd 0.63 0.51 0.39
 Ke 0 0 0
 
 newmtl ceramic
@@ -70,21 +110,9 @@ newmtl book_red
 Kd 0.45 0.055 0.04
 Ke 0 0 0
 
-newmtl book_blue
-Kd 0.055 0.15 0.34
-Ke 0 0 0
-
-newmtl book_green
-Kd 0.08 0.28 0.16
-Ke 0 0 0
-
 newmtl lamp_shade
 Kd 0.88 0.77 0.56
 Ke 0 0 0
-
-newmtl glass_warm
-Kd 0.78 0.58 0.18
-Ke 0.55 0.34 0.09
 
 newmtl window_glow
 Kd 1 0.72 0.2
@@ -127,7 +155,7 @@ Kd 0.52 0.08 0.06
 Ke 0.08 0.012 0.008
 
 newmtl white_piece
-Kd 0.86 0.82 0.7
+Kd 0.78 0.75 0.66
 Ke 0 0 0
 
 newmtl black_piece
@@ -172,9 +200,9 @@ Ke 0 0 0
 
 newmtl light_panel
 Kd 1 1 1
-Ke 95 74 52
+Ke 18 14 10
 
 newmtl light_fill
 Kd 1 1 1
-Ke 58 46 34
+Ke 10 8 6
 

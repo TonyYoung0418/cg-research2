@@ -1,3 +1,13 @@
+// External asset note for submission:
+// - 57-estancia_comedor_obj/room.obj is a borrowed source room mesh used only
+//   as input furniture geometry during scene generation.
+// - Free_Stuff_1_-__Chess_Set/OBJ/*.obj are TurboSquid chess meshes used as
+//   imported scene assets.
+// - Mirror/Mirror_Frame.obj and Mirror/Mirror_Surface.obj are user-authored
+//   mirror meshes exported from Maya.
+// - If any AI tools or additional borrowed code contributed to this file,
+//   declare them here before submission as required by the assignment.
+
 #include "scene_builder.hpp"
 
 #include <algorithm>
@@ -40,6 +50,11 @@ std::string safeObjectName(const std::string &name) {
     return out.empty() ? "Object" : out;
 }
 
+std::string baseName(const std::string &path) {
+    size_t pos = path.find_last_of("/\\");
+    return pos == std::string::npos ? path : path.substr(pos + 1);
+}
+
 bool isRoomFurnitureObject(const std::string &name) {
     std::string n = lowerCopy(name);
     if (n.empty()) return false;
@@ -80,6 +95,72 @@ bool isCoffeeTableObject(int serial) {
     return (serial >= 70 && serial <= 75) || (serial >= 200 && serial <= 229) || (serial >= 231 && serial <= 237);
 }
 
+bool isSofaBaseObject(int serial) {
+    return serial == 24;
+}
+
+bool isSofaSeatCushionObject(int serial) {
+    return serial == 25;
+}
+
+bool isSofaCushionObject(int serial) {
+    return serial >= 26 && serial <= 30;
+}
+
+bool isSofaPillowObject(int serial) {
+    return serial >= 31 && serial <= 34;
+}
+
+bool isCoffeeTableApronObject(int serial) {
+    return serial == 70;
+}
+
+bool isCoffeeTableTopObject(int serial) {
+    return serial == 73;
+}
+
+bool isCoffeeTableLegObject(int serial) {
+    return serial == 71 || serial == 72 || serial == 74 || serial == 75;
+}
+
+bool isTabletopAccessoryObject(int serial) {
+    return (serial >= 200 && serial <= 229) || (serial >= 231 && serial <= 237);
+}
+
+bool isTabletopVesselObject(int serial) {
+    return serial == 200 || serial == 201 || serial == 203 || serial == 231 ||
+           serial == 235 || serial == 236 || serial == 237;
+}
+
+bool isTabletopWhiteCupObject(int serial) {
+    return serial == 231 || serial == 232;
+}
+
+bool isTabletopGoldCupObject(int serial) {
+    return serial == 235 || serial == 236 || serial == 237;
+}
+
+bool isTabletopStemObject(int serial) {
+    return serial == 202 || (serial >= 204 && serial <= 210) || (serial >= 219 && serial <= 229);
+}
+
+bool isTabletopLeafObject(int serial) {
+    return serial >= 211 && serial <= 218;
+}
+
+bool isTabletopBookObject(int serial) {
+    return serial == 233 || serial == 234;
+}
+
+bool isLoungeChairFrameObject(int serial) {
+    return serial == 187 || serial == 188 || serial == 189 || serial == 190 ||
+           serial == 192 || serial == 195;
+}
+
+bool isLoungeChairCushionObject(int serial) {
+    return serial == 191 || serial == 193 || serial == 194 || serial == 196 || serial == 197;
+}
+
 bool isRemovedDiningSetObject(int serial) {
     if (serial >= 100 && serial <= 186) return true;
     if (serial >= 76 && serial <= 96) return true;
@@ -92,23 +173,47 @@ struct RoomImportPolicy {
     Vec3 offset;
 };
 
+constexpr double kSofaGroundOffsetY = -0.00231;
+constexpr double kCoffeeTableGroundOffsetY = -0.02011;
+constexpr double kLoungeChairGroundOffsetY = -0.02205;
+
 RoomImportPolicy roomImportPolicy(int serial, const std::string &name, bool reflectionLoungeCopy) {
     if (!isRoomFurnitureObject(name)) return {};
 
     if (reflectionLoungeCopy) {
         if (!isLoungeChairObject(serial)) return {};
-        return {true, "ReflectionOnly", {-1.35, 0.0, 0.06}};
+        return {true, "ReflectionOnly", {-1.35, kLoungeChairGroundOffsetY, 0.06}};
     }
 
     if (isSmallCabinetObject(serial) || isRemovedDiningSetObject(serial)) return {};
-    if (isSofaObject(serial)) return {true, "CameraOnly", {0.25, 0.0, 0.0}};
-    if (isCoffeeTableObject(serial)) return {true, "", {0.85, 0.0, 0.0}};
-    if (isLoungeChairObject(serial)) return {true, "", {1.25, 0.0, 0.0}};
+    if (isSofaObject(serial)) {
+        double yOffset = kSofaGroundOffsetY;
+        if (serial == 24) yOffset -= 0.02441;
+        if (serial == 26 || serial == 27) yOffset -= 0.02141;
+        return {true, "CameraOnly", {0.25, yOffset, 0.0}};
+    }
+    if (isCoffeeTableObject(serial)) return {true, "", {0.85, kCoffeeTableGroundOffsetY, 0.0}};
+    if (isLoungeChairObject(serial)) return {true, "", {1.25, kLoungeChairGroundOffsetY, 0.0}};
     return {true, "", {0.0, 0.0, 0.0}};
 }
 
-std::string roomFurnitureMaterial(const std::string &name) {
+std::string roomFurnitureMaterial(int serial, const std::string &name) {
     std::string n = lowerCopy(name);
+    if (isSofaBaseObject(serial)) return "sofa_body";
+    if (isSofaSeatCushionObject(serial)) return "sofa_pillow";
+    if (isSofaCushionObject(serial)) return "sofa_cushion";
+    if (isSofaPillowObject(serial)) return "sofa_pillow";
+    if (isLoungeChairFrameObject(serial)) return "chair_frame";
+    if (isLoungeChairCushionObject(serial)) return "chair_cushion";
+    if (isCoffeeTableTopObject(serial)) return "table_top";
+    if (isCoffeeTableApronObject(serial) || isCoffeeTableLegObject(serial)) return "table_base";
+    if (isTabletopLeafObject(serial)) return "leaf";
+    if (isTabletopStemObject(serial)) return "tabletop_reed";
+    if (isTabletopWhiteCupObject(serial)) return "tabletop_cup_white";
+    if (isTabletopGoldCupObject(serial)) return "tabletop_cup_gold";
+    if (isTabletopVesselObject(serial)) return "tabletop_vessel";
+    if (isTabletopBookObject(serial)) return "tabletop_book";
+    if (isTabletopAccessoryObject(serial)) return "tabletop_light";
     if (startsWith(n, "book")) return "book_red";
     if (n.find("shelf") != std::string::npos || n.find("basket") != std::string::npos) return "old_wood_dark";
     if (n.find("carpet") != std::string::npos) return "rug";
@@ -185,25 +290,6 @@ public:
             int j = (i + 1) % segments;
             obj << "f " << in[i] << " " << out[i] << " " << out[j] << "\n";
             obj << "f " << in[i] << " " << out[j] << " " << in[j] << "\n";
-        }
-    }
-
-    void ellipseSurface(const std::string &object, const std::string &mat, Vec3 center,
-                        double rx, double ry, double z, int bands) {
-        obj << "o " << object << "\nusemtl " << mat << "\n";
-        for (int b = 0; b < bands; ++b) {
-            double y0n = -1.0 + 2.0 * b / bands;
-            double y1n = -1.0 + 2.0 * (b + 1) / bands;
-            double x0 = rx * std::sqrt(std::max(0.0, 1.0 - y0n * y0n));
-            double x1 = rx * std::sqrt(std::max(0.0, 1.0 - y1n * y1n));
-            double y0 = center.y + ry * y0n;
-            double y1 = center.y + ry * y1n;
-            int a = vertex({center.x - x0, y0, z});
-            int bb = vertex({center.x + x0, y0, z});
-            int c = vertex({center.x + x1, y1, z});
-            int d = vertex({center.x - x1, y1, z});
-            obj << "f " << a << " " << bb << " " << c << "\n";
-            obj << "f " << a << " " << c << " " << d << "\n";
         }
     }
 
@@ -393,7 +479,7 @@ public:
                 if (emittedObject != currentObject) {
                     obj << "o " << policy.visibilityPrefix << "ImportedRoomFurniture_" << objectSerial
                         << "_" << safeObjectName(currentObject)
-                        << "\nusemtl " << roomFurnitureMaterial(currentObject) << "\n";
+                        << "\nusemtl " << roomFurnitureMaterial(objectSerial, currentObject) << "\n";
                     emittedObject = currentObject;
                 }
                 std::vector<int> ids;
@@ -452,19 +538,26 @@ void writeMtl(const BuildOptions &opt) {
     mat("curtain_dark", {0.16, 0.025, 0.025});
     mat("rug", {0.26, 0.14, 0.075});
     mat("rug_border", {0.70, 0.50, 0.28});
-    mat("table", {0.32, 0.16, 0.065});
-    mat("table_dark", {0.075, 0.042, 0.024});
+    mat("table_top", {0.46, 0.27, 0.12});
+    mat("table_base", {0.22, 0.12, 0.055});
+    mat("tabletop_light", {0.72, 0.56, 0.34});
+    mat("tabletop_vessel", {0.80, 0.75, 0.68});
+    mat("tabletop_reed", {0.26, 0.17, 0.09});
+    mat("tabletop_cup_white", {0.91, 0.89, 0.85});
+    mat("tabletop_cup_gold", {0.62, 0.42, 0.18});
+    mat("tabletop_book", {0.97, 0.97, 0.97});
     mat("wood_light", {0.63, 0.33, 0.15});
-    mat("wood_glow", {0.82, 0.52, 0.27});
-    mat("frame", {0.90, 0.62, 0.24});
+    mat("frame", {0.62, 0.42, 0.18});
     mat("brass", {0.80, 0.57, 0.22});
+    mat("sofa_body", {0.46, 0.29, 0.16});
+    mat("sofa_cushion", {0.62, 0.45, 0.28});
+    mat("sofa_pillow", {0.67, 0.58, 0.45});
+    mat("chair_frame", {0.57, 0.36, 0.18});
+    mat("chair_cushion", {0.63, 0.51, 0.39});
     mat("ceramic", {0.82, 0.76, 0.64});
     mat("leaf", {0.10, 0.35, 0.16});
     mat("book_red", {0.45, 0.055, 0.040});
-    mat("book_blue", {0.055, 0.15, 0.34});
-    mat("book_green", {0.08, 0.28, 0.16});
     mat("lamp_shade", {0.88, 0.77, 0.56});
-    mat("glass_warm", {0.78, 0.58, 0.18}, {0.55, 0.34, 0.09});
     mat("window_glow", {1.0, 0.72, 0.20}, {1.25, 0.72, 0.20});
     mat("stone", {0.30, 0.31, 0.29});
     mat("bark", {0.22, 0.10, 0.035});
@@ -475,7 +568,7 @@ void writeMtl(const BuildOptions &opt) {
     mat("painting_green", {0.16, 0.46, 0.40}, {0.035, 0.08, 0.06});
     mat("painting_orange", {0.78, 0.34, 0.12}, {0.12, 0.045, 0.015});
     mat("painting_red", {0.52, 0.08, 0.06}, {0.08, 0.012, 0.008});
-    mat("white_piece", {0.86, 0.82, 0.70});
+    mat("white_piece", {0.78, 0.75, 0.66});
     mat("black_piece", {0.035, 0.030, 0.026});
     mat("matte_black", {0.02, 0.02, 0.025});
     mat("plaster_light", {0.72, 0.58, 0.43});
@@ -486,8 +579,8 @@ void writeMtl(const BuildOptions &opt) {
     mat("old_wood_light", {0.60, 0.30, 0.11});
     mat("dust", {0.18, 0.14, 0.10});
     mat("shadow_hole", {0.018, 0.014, 0.011});
-    mat("light_panel", {1, 1, 1}, {95.0, 74.0, 52.0});
-    mat("light_fill", {1, 1, 1}, {58.0, 46.0, 34.0});
+    mat("light_panel", {1, 1, 1}, {18.0, 14.0, 10.0});
+    mat("light_fill", {1, 1, 1}, {10.0, 8.0, 6.0});
 }
 
 } // namespace
@@ -495,7 +588,7 @@ void writeMtl(const BuildOptions &opt) {
 void writeSceneObj(const BuildOptions &opt) {
     writeMtl(opt);
     ObjWriter w(opt.objPath);
-    w.obj << "mtllib generated_scene.mtl\n";
+    w.obj << "mtllib " << baseName(opt.mtlPath) << "\n";
 
     w.quad("Floor", "floor", {-5.8, 0.0, -3.35}, {5.8, 0.0, -3.35}, {5.8, 0.0, 7.2}, {-5.8, 0.0, 7.2});
     w.quad("BackWall", "wall", {5.8, 0.0, -3.35}, {-5.8, 0.0, -3.35}, {-5.8, 3.5, -3.35}, {5.8, 3.5, -3.35});
@@ -517,20 +610,23 @@ void writeSceneObj(const BuildOptions &opt) {
     w.box("OldDoorPanel", "old_wood", {3.32, 0.00, -3.00}, {4.40, 2.66, -2.82});
     w.box("DoorInsetUpper", "old_wood_light", {3.50, 1.55, -2.80}, {4.22, 2.42, -2.70});
     w.box("DoorInsetLower", "old_wood_light", {3.50, 0.32, -2.80}, {4.22, 1.20, -2.70});
-    w.box("DoorCenterRail", "old_wood_dark", {3.83, 0.06, -2.68}, {3.96, 2.56, -2.56});
-    w.disk("DoorKnob", "brass", {4.26, 1.28, -2.52}, 0.065, 0.065, -2.48, 16);
+    w.box("DoorCenterRail", "old_wood_dark", {3.84, 0.06, -2.72}, {3.95, 2.66, -2.60});
+    w.ellipseBand("DoorHandleRosetteRing", "brass", {4.235, 1.28, 0.0}, 0.022, 0.022, 0.052, 0.052, -2.66, 18);
+    w.disk("DoorHandleRosetteCore", "brass", {4.235, 1.28, 0.0}, 0.022, 0.022, -2.655, 18);
+    w.box("DoorHandleStem", "brass", {4.205, 1.255, -2.655}, {4.255, 1.305, -2.595});
+    w.box("DoorHandleLeverMain", "brass", {4.02, 1.264, -2.628}, {4.205, 1.296, -2.582});
+    w.box("DoorHandleLeverTip", "brass", {3.95, 1.268, -2.622}, {4.02, 1.292, -2.588});
 
     w.box("MantelTop", "old_wood_dark", {-4.95, 1.18, -3.06}, {-2.08, 1.36, -2.68});
     w.box("MantelShelf", "old_wood", {-5.16, 1.34, -2.98}, {-1.86, 1.48, -2.56});
     w.box("MantelLeftPost", "old_wood_dark", {-4.92, 0.00, -3.00}, {-4.64, 1.30, -2.62});
     w.box("MantelRightPost", "old_wood_dark", {-2.38, 0.00, -3.00}, {-2.10, 1.30, -2.62});
-    w.box("MirrorBackPlate", "matte_black", {-2.12, 0.00, 1.04}, {2.12, 1.88, 1.12});
-    w.quad("FloorMirrorSurface", "mirror", {-1.90, 0.10, 1.125}, {1.90, 0.10, 1.125},
-           {1.90, 1.60, 1.125}, {-1.90, 1.60, 1.125});
-    w.box("MirrorFrameLeft", "frame", {-2.12, 0.00, 1.13}, {-2.00, 1.88, 1.22});
-    w.box("MirrorFrameRight", "frame", {2.00, 0.00, 1.13}, {2.12, 1.88, 1.22});
-    w.box("MirrorFrameTop", "frame", {-2.12, 1.60, 1.13}, {2.12, 1.88, 1.22});
-    w.box("MirrorFrameBottom", "frame", {-2.12, 0.00, 1.13}, {2.12, 0.10, 1.22});
+    // Import the user-authored mirror model from Maya while keeping the same
+    // frame and mirror materials used by the renderer.
+    const Vec3 mirrorModelOffset{0.0, 0.86, 1.125};
+    constexpr double mirrorModelScale = 0.01;
+    w.model("Mirror/Mirror_Frame.obj", "CustomMirrorFrame", "frame", mirrorModelOffset, mirrorModelScale);
+    w.model("Mirror/Mirror_Surface.obj", "CustomMirrorSurface", "mirror", mirrorModelOffset, mirrorModelScale);
 
     double ls = opt.lightSize;
     Vec3 lp{opt.lightPos[0], opt.lightPos[1], opt.lightPos[2]};
@@ -551,18 +647,18 @@ void writeSceneObj(const BuildOptions &opt) {
         w.model(assetDir + file, name, mat, p, scale, angle);
     };
 
-    place("GEO_WhitePawn_08.obj", "VisiblePawnA", "ceramic", {-1.02, 0.01, 3.50}, 0.0, 5.6);
-    place("GEO_WhitePawn_08.obj", "VisiblePawnB", "ceramic", {-0.36, 0.01, 3.44}, 0.0, 5.6);
-    place("GEO_WhitePawn_08.obj", "VisiblePawnC", "ceramic", {0.36, 0.01, 3.44}, 0.0, 5.6);
-    place("GEO_WhitePawn_08.obj", "VisiblePawnD", "ceramic", {1.02, 0.01, 3.50}, 0.0, 5.6);
+    place("GEO_WhitePawn_08.obj", "VisiblePawnA", "ceramic", {-1.02, -0.0006, 3.50}, 0.0, 5.6);
+    place("GEO_WhitePawn_08.obj", "VisiblePawnB", "ceramic", {-0.36, -0.0006, 3.44}, 0.0, 5.6);
+    place("GEO_WhitePawn_08.obj", "VisiblePawnC", "ceramic", {0.36, -0.0006, 3.44}, 0.0, 5.6);
+    place("GEO_WhitePawn_08.obj", "VisiblePawnD", "ceramic", {1.02, -0.0006, 3.50}, 0.0, 5.6);
 
-    place("GEO_WhiteRook_02.obj", "VisibleWhiteRook", "ceramic", {-0.86, 0.01, 2.92}, 0.0, 5.8);
-    place("GEO_WhiteKnight_02.obj", "CameraOnlyWhiteKnight", "ceramic", {-0.48, 0.01, 2.98}, -0.25, 5.8);
-    place("GEO_WhiteBishop_02.obj", "ReflectionOnlyWhiteBishop", "ceramic", {-0.48, 0.01, 2.98}, 0.0, 6.0);
-    place("GEO_WhiteBishop_02.obj", "VisibleWhiteBishop", "ceramic", {-0.14, 0.01, 3.02}, 0.0, 6.0);
-    place("GEO_WhiteKing.obj", "VisibleWhiteKing", "ceramic", {0.22, 0.01, 3.00}, 0.0, 6.7);
-    place("GEO_WhiteQueen.obj", "CameraOnlyWhiteQueen", "ceramic", {0.72, 0.01, 2.92}, 0.0, 6.1);
-    place("GEO_WhiteKing.obj", "ReflectionOnlyWhiteKing", "ceramic", {0.72, 0.01, 2.92}, 0.0, 6.4);
+    place("GEO_WhiteRook_02.obj", "VisibleWhiteRook", "ceramic", {-0.86, 0.0, 2.92}, 0.0, 5.8);
+    place("GEO_WhiteKnight_02.obj", "CameraOnlyWhiteKnight", "ceramic", {-0.48, 0.00234, 2.98}, -0.25, 5.8);
+    place("GEO_WhiteBishop_02.obj", "ReflectionOnlyWhiteBishop", "ceramic", {-0.48, 0.0, 2.98}, 0.0, 6.0);
+    place("GEO_WhiteBishop_02.obj", "VisibleWhiteBishop", "ceramic", {-0.14, 0.0, 3.02}, 0.0, 6.0);
+    place("GEO_WhiteKing.obj", "VisibleWhiteKing", "ceramic", {0.22, -0.00009, 3.00}, 0.0, 6.7);
+    place("GEO_WhiteQueen.obj", "CameraOnlyWhiteQueen", "ceramic", {0.72, 0.0, 2.92}, 0.0, 6.1);
+    place("GEO_WhiteKing.obj", "ReflectionOnlyWhiteKing", "ceramic", {0.72, -0.00009, 2.92}, 0.0, 6.4);
 }
 
 } // namespace scene_builder

@@ -1,3 +1,9 @@
+// External resource note for submission:
+// - textures/old_wood_floor.ppm is derived from Poly Haven's "Old Wood Floor"
+//   CC0 texture and is sampled by the renderer below.
+// - If any AI tools or additional borrowed code contributed to this file,
+//   declare them here before submission as required by the assignment.
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -12,6 +18,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 #include "scene_builder.hpp"
@@ -134,6 +141,11 @@ bool hasTexture(const Texture &tex) {
     return tex.width > 0 && tex.height > 0 && !tex.pixels.empty();
 }
 
+bool fileExists(const std::string &path) {
+    std::ifstream in(path, std::ios::binary);
+    return static_cast<bool>(in);
+}
+
 double srgbToLinear(double v) {
     v = std::clamp(v, 0.0, 1.0);
     return std::pow(v, 2.2);
@@ -202,6 +214,9 @@ struct Triangle {
     Vec3 centroid;
     Vec3 bmin, bmax;
     double area = 0.0;
+    int vi0 = 0;
+    int vi1 = 0;
+    int vi2 = 0;
     int material = 0;
     int visibility = kVisibleToAll;
     bool hasVertexNormals = false;
@@ -368,19 +383,26 @@ std::vector<Material> makeMaterials(const Options &opt, std::map<std::string, in
     add({"curtain_dark", {0.16, 0.025, 0.025}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"rug", {0.26, 0.14, 0.075}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"rug_border", {0.70, 0.50, 0.28}, {0, 0, 0}, 0.1, 1.5, 1, false});
-    add({"table", {0.32, 0.16, 0.065}, {0, 0, 0}, 0.04, 1.5, 0, false});
-    add({"table_dark", {0.075, 0.042, 0.024}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"table_top", {0.46, 0.27, 0.12}, {0, 0, 0}, 0.05, 1.5, 0, false});
+    add({"table_base", {0.22, 0.12, 0.055}, {0, 0, 0}, 0.02, 1.5, 0, false});
+    add({"tabletop_light", {0.72, 0.56, 0.34}, {0, 0, 0}, 0.04, 1.5, 0, false});
+    add({"tabletop_vessel", {0.80, 0.75, 0.68}, {0, 0, 0}, 0.0, 1.5, 0, false});
+    add({"tabletop_reed", {0.26, 0.17, 0.09}, {0, 0, 0}, 0.02, 1.5, 0, false});
+    add({"tabletop_cup_white", {0.91, 0.89, 0.85}, {0, 0, 0}, 0.0, 1.5, 0, false});
+    add({"tabletop_cup_gold", {0.62, 0.42, 0.18}, {0, 0, 0}, 0.0, 1.5, 0, false});
+    add({"tabletop_book", {0.97, 0.97, 0.97}, {0, 0, 0}, 0.0, 1.5, 0, false});
     add({"wood_light", {0.63, 0.33, 0.15}, {0, 0, 0}, 0.02, 1.5, 0, false});
-    add({"wood_glow", {0.82, 0.52, 0.27}, {0, 0, 0}, 0.08, 1.5, 1, false});
-    add({"frame", {0.90, 0.62, 0.24}, {0, 0, 0}, 0.0, 1.5, 0, false});
+    add({"frame", {0.62, 0.42, 0.18}, {0, 0, 0}, 0.028, 1.5, 1, false});
     add({"brass", {0.80, 0.57, 0.22}, {0, 0, 0}, 0.12, 1.5, 1, false});
+    add({"sofa_body", {0.46, 0.29, 0.16}, {0, 0, 0}, 0.0, 1.5, 0, false});
+    add({"sofa_cushion", {0.62, 0.45, 0.28}, {0, 0, 0}, 0.0, 1.5, 0, false});
+    add({"sofa_pillow", {0.67, 0.58, 0.45}, {0, 0, 0}, 0.0, 1.5, 0, false});
+    add({"chair_frame", {0.57, 0.36, 0.18}, {0, 0, 0}, 0.02, 1.5, 0, false});
+    add({"chair_cushion", {0.63, 0.51, 0.39}, {0, 0, 0}, 0.0, 1.5, 0, false});
     add({"ceramic", {0.82, 0.76, 0.64}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"leaf", {0.10, 0.35, 0.16}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"book_red", {0.45, 0.055, 0.040}, {0, 0, 0}, 0, 1.5, 0, false});
-    add({"book_blue", {0.055, 0.15, 0.34}, {0, 0, 0}, 0, 1.5, 0, false});
-    add({"book_green", {0.08, 0.28, 0.16}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"lamp_shade", {0.88, 0.77, 0.56}, {0, 0, 0}, 0, 1.5, 0, false});
-    add({"glass_warm", {0.78, 0.58, 0.18}, {0.55, 0.34, 0.09}, 0, 1.5, 0, false});
     add({"window_glow", {1.0, 0.72, 0.20}, {1.25, 0.72, 0.20}, 0, 1.5, 0, false});
     add({"stone", {0.30, 0.31, 0.29}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"bark", {0.22, 0.10, 0.035}, {0, 0, 0}, 0, 1.5, 0, false});
@@ -454,6 +476,100 @@ int objectVisibility(const std::string &object) {
     return kVisibleToAll;
 }
 
+void rebuildSmoothNormalsForMaterial(std::vector<Triangle> &tris, int materialId) {
+    std::map<std::pair<std::string, int>, Vec3> accum;
+    for (const auto &tri : tris) {
+        if (tri.material != materialId) continue;
+        Vec3 weightedNormal = tri.area * tri.normal;
+        accum[{tri.object, tri.vi0}] += weightedNormal;
+        accum[{tri.object, tri.vi1}] += weightedNormal;
+        accum[{tri.object, tri.vi2}] += weightedNormal;
+    }
+
+    for (auto &tri : tris) {
+        if (tri.material != materialId) continue;
+        auto smoothNormal = [&](int vertexId) {
+            auto it = accum.find({tri.object, vertexId});
+            return (it != accum.end() && length(it->second) > 0.0) ? normalize(it->second) : tri.normal;
+        };
+        tri.n0 = smoothNormal(tri.vi0);
+        tri.n1 = smoothNormal(tri.vi1);
+        tri.n2 = smoothNormal(tri.vi2);
+        tri.hasVertexNormals = true;
+    }
+}
+
+void rebuildSmoothNormalsForObjectGroup(std::vector<Triangle> &tris,
+                                        const std::vector<std::string> &objectPrefixes,
+                                        double mergeRadius) {
+    auto matchesPrefix = [&](const std::string &object) {
+        for (const auto &prefix : objectPrefixes) {
+            if (object.rfind(prefix, 0) == 0) return true;
+        }
+        return false;
+    };
+
+    struct VertexEntry {
+        Vec3 position;
+        Vec3 normalSum{0.0, 0.0, 0.0};
+    };
+    using VertexKey = std::pair<std::string, int>;
+    using CellKey = std::tuple<int, int, int>;
+
+    std::map<VertexKey, VertexEntry> entries;
+    auto accumulateVertex = [&](const Triangle &tri, int vertexId, const Vec3 &position) {
+        auto &entry = entries[{tri.object, vertexId}];
+        entry.position = position;
+        entry.normalSum += tri.area * tri.normal;
+    };
+
+    for (const auto &tri : tris) {
+        if (!matchesPrefix(tri.object)) continue;
+        accumulateVertex(tri, tri.vi0, tri.v0);
+        accumulateVertex(tri, tri.vi1, tri.v1);
+        accumulateVertex(tri, tri.vi2, tri.v2);
+    }
+    if (entries.empty()) return;
+
+    std::map<CellKey, std::vector<VertexKey>> grid;
+    double invCell = 1.0 / mergeRadius;
+    auto cellFor = [&](const Vec3 &p) {
+        return CellKey{int(std::floor(p.x * invCell)), int(std::floor(p.y * invCell)), int(std::floor(p.z * invCell))};
+    };
+    for (const auto &[key, entry] : entries) {
+        grid[cellFor(entry.position)].push_back(key);
+    }
+
+    double radius2 = mergeRadius * mergeRadius;
+    std::map<VertexKey, Vec3> smoothed;
+    for (const auto &[key, entry] : entries) {
+        auto [cx, cy, cz] = cellFor(entry.position);
+        Vec3 sum{0.0, 0.0, 0.0};
+        for (int dx = -1; dx <= 1; ++dx) {
+            for (int dy = -1; dy <= 1; ++dy) {
+                for (int dz = -1; dz <= 1; ++dz) {
+                    auto it = grid.find(CellKey{cx + dx, cy + dy, cz + dz});
+                    if (it == grid.end()) continue;
+                    for (const auto &otherKey : it->second) {
+                        const auto &other = entries.at(otherKey);
+                        Vec3 delta = other.position - entry.position;
+                        if (dot(delta, delta) <= radius2) sum += other.normalSum;
+                    }
+                }
+            }
+        }
+        smoothed[key] = length(sum) > 0.0 ? normalize(sum) : normalize(entry.normalSum);
+    }
+
+    for (auto &tri : tris) {
+        if (!matchesPrefix(tri.object)) continue;
+        tri.n0 = smoothed[{tri.object, tri.vi0}];
+        tri.n1 = smoothed[{tri.object, tri.vi1}];
+        tri.n2 = smoothed[{tri.object, tri.vi2}];
+        tri.hasVertexNormals = true;
+    }
+}
+
 bool canRaySee(const Ray &ray, const Triangle &tri) {
     if (tri.visibility == kVisibleToAll) return true;
     if (tri.visibility == kCameraOnly) return ray.visibility == kPrimaryRay;
@@ -498,6 +614,9 @@ std::vector<Triangle> loadObj(const Options &opt, const std::map<std::string, in
                 t.v0 = verts[ids[0].v];
                 t.v1 = verts[ids[i].v];
                 t.v2 = verts[ids[i + 1].v];
+                t.vi0 = ids[0].v;
+                t.vi1 = ids[i].v;
+                t.vi2 = ids[i + 1].v;
                 if (ids[0].vn > 0 && ids[0].vn < int(norms.size()) &&
                     ids[i].vn > 0 && ids[i].vn < int(norms.size()) &&
                     ids[i + 1].vn > 0 && ids[i + 1].vn < int(norms.size())) {
@@ -534,6 +653,20 @@ std::vector<Triangle> loadObj(const Options &opt, const std::map<std::string, in
             finalizeTriangle(t);
         }
     }
+    for (const char *softFurnitureMat : {"sofa_body", "sofa_cushion", "sofa_pillow"}) {
+        auto it = matIds.find(softFurnitureMat);
+        if (it == matIds.end()) continue;
+        // The borrowed room asset ships broken upholstery normals that create
+        // visible seams and blotchy shading; rebuild smooth normals for the
+        // soft sofa pieces inside the renderer.
+        rebuildSmoothNormalsForMaterial(tris, it->second);
+    }
+    // The three back-cushion objects are modeled as separate strips with tiny
+    // gaps, so smooth them together across nearby boundary vertices.
+    rebuildSmoothNormalsForObjectGroup(
+        tris,
+        {"CameraOnlyImportedRoomFurniture_28", "CameraOnlyImportedRoomFurniture_29", "CameraOnlyImportedRoomFurniture_30"},
+        0.04);
     return tris;
 }
 
@@ -564,7 +697,19 @@ struct Scene {
         buildOpt.lightPos[2] = opt.lightPos.z;
         buildOpt.lightSize = opt.lightSize;
         buildOpt.extraLight = opt.extraLight;
-        scene_builder::writeSceneObj(buildOpt);
+        const std::string roomAssetPath = "57-estancia_comedor_obj/room.obj";
+        if (fileExists(roomAssetPath)) {
+            scene_builder::writeSceneObj(buildOpt);
+        } else if (fileExists(opt.objPath)) {
+            std::cerr << "Warning: " << roomAssetPath
+                      << " not found; using existing " << opt.objPath
+                      << " without regenerating the scene\n";
+        } else {
+            std::cerr << "Could not regenerate scene because " << roomAssetPath
+                      << " is missing, and fallback scene " << opt.objPath
+                      << " was not found\n";
+            std::exit(1);
+        }
         triangles = loadObj(opt, matIds);
         for (int i = 0; i < int(triangles.size()); ++i) {
             const Material &m = materials[triangles[i].material];
@@ -789,7 +934,10 @@ struct Scene {
                 if (depth == 0) radiance += throughput * mat.emission;
                 break;
             }
-            radiance += throughput * sampleDirect(hit, mat, ray.visibility, rng);
+            // Keep a small amount of direct light on the mirror for a softer, more staged look
+            // without bringing back the frosted veil from full diffuse lighting.
+            double directLightScale = mat.name == "mirror" ? 0.12 : 1.0;
+            radiance += throughput * (directLightScale * sampleDirect(hit, mat, ray.visibility, rng));
             Ray scattered;
             Vec3 atten;
             if (!scatter(ray, hit, mat, rng, atten, scattered)) break;

@@ -28,3 +28,6 @@ Free_Stuff_1_-__Chess_Set/OBJ/*
 !Free_Stuff_1_-__Chess_Set/OBJ/GEO_WhiteKing.mtl
 !Free_Stuff_1_-__Chess_Set/OBJ/GEO_WhiteQueen.obj
 !Free_Stuff_1_-__Chess_Set/OBJ/GEO_WhiteQueen.mtl
+
+# Ignore Windows download zone metadata sidecar files.
+*:Zone.Identifier
