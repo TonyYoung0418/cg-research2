@@ -60,6 +60,24 @@ Vec3 normalize(Vec3 v) { double len = length(v); return len > 0.0 ? v / len : Ve
 Vec3 clamp01(const Vec3 &v) {
     return {std::clamp(v.x, 0.0, 1.0), std::clamp(v.y, 0.0, 1.0), std::clamp(v.z, 0.0, 1.0)};
 }
+double gammaEncode(double v) {
+    return std::pow(std::clamp(v, 0.0, 1.0), 1.0 / 2.2);
+}
+
+double acesFilm(double x) {
+    x = std::max(0.0, x);
+    constexpr double a = 2.51;
+    constexpr double b = 0.03;
+    constexpr double c = 2.43;
+    constexpr double d = 0.59;
+    constexpr double e = 0.14;
+    return std::clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
+Vec3 filmicTonemap(const Vec3 &color) {
+    Vec3 exposed = 1.08 * color;
+    return {acesFilm(exposed.x), acesFilm(exposed.y), acesFilm(exposed.z)};
+}
 Vec3 minVec(const Vec3 &a, const Vec3 &b) {
     return {std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z)};
 }
@@ -129,6 +147,8 @@ struct Material {
     double ior = 1.5;
     int type = 0; // 0 diffuse, 1 metal, 2 glass, 3 emissive
     bool sampleLight = false;
+    double specular = 0.0;
+    double shininess = 32.0;
 };
 
 struct Texture {
@@ -378,28 +398,28 @@ std::vector<Material> makeMaterials(const Options &opt, std::map<std::string, in
     add({"floor_sheen", {0.62, 0.50, 0.38}, {0, 0, 0}, 0.42, 1.5, 1, false});
     add({"wall", {0.55, 0.36, 0.24}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"dark_wall", {0.20, 0.12, 0.075}, {0, 0, 0}, 0, 1.5, 0, false});
-    add({"trim", {0.78, 0.68, 0.52}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"trim", {0.78, 0.68, 0.52}, {0, 0, 0}, 0, 1.5, 0, false, 0.045, 56.0});
     add({"curtain", {0.36, 0.045, 0.040}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"curtain_dark", {0.16, 0.025, 0.025}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"rug", {0.26, 0.14, 0.075}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"rug_border", {0.70, 0.50, 0.28}, {0, 0, 0}, 0.1, 1.5, 1, false});
-    add({"table_top", {0.46, 0.27, 0.12}, {0, 0, 0}, 0.05, 1.5, 0, false});
-    add({"table_base", {0.22, 0.12, 0.055}, {0, 0, 0}, 0.02, 1.5, 0, false});
-    add({"tabletop_light", {0.72, 0.56, 0.34}, {0, 0, 0}, 0.04, 1.5, 0, false});
-    add({"tabletop_vessel", {0.80, 0.75, 0.68}, {0, 0, 0}, 0.0, 1.5, 0, false});
+    add({"table_top", {0.46, 0.27, 0.12}, {0, 0, 0}, 0.05, 1.5, 0, false, 0.05, 56.0});
+    add({"table_base", {0.22, 0.12, 0.055}, {0, 0, 0}, 0.02, 1.5, 0, false, 0.032, 44.0});
+    add({"tabletop_light", {0.72, 0.56, 0.34}, {0, 0, 0}, 0.04, 1.5, 0, false, 0.04, 48.0});
+    add({"tabletop_vessel", {0.80, 0.75, 0.68}, {0, 0, 0}, 0.0, 1.5, 0, false, 0.10, 88.0});
     add({"tabletop_reed", {0.26, 0.17, 0.09}, {0, 0, 0}, 0.02, 1.5, 0, false});
-    add({"tabletop_cup_white", {0.91, 0.89, 0.85}, {0, 0, 0}, 0.0, 1.5, 0, false});
-    add({"tabletop_cup_gold", {0.62, 0.42, 0.18}, {0, 0, 0}, 0.0, 1.5, 0, false});
+    add({"tabletop_cup_white", {0.91, 0.89, 0.85}, {0, 0, 0}, 0.0, 1.5, 0, false, 0.12, 112.0});
+    add({"tabletop_cup_gold", {0.62, 0.42, 0.18}, {0, 0, 0}, 0.0, 1.5, 0, false, 0.07, 76.0});
     add({"tabletop_book", {0.97, 0.97, 0.97}, {0, 0, 0}, 0.0, 1.5, 0, false});
     add({"wood_light", {0.63, 0.33, 0.15}, {0, 0, 0}, 0.02, 1.5, 0, false});
-    add({"frame", {0.62, 0.42, 0.18}, {0, 0, 0}, 0.028, 1.5, 1, false});
-    add({"brass", {0.80, 0.57, 0.22}, {0, 0, 0}, 0.12, 1.5, 1, false});
-    add({"sofa_body", {0.46, 0.29, 0.16}, {0, 0, 0}, 0.0, 1.5, 0, false});
-    add({"sofa_cushion", {0.62, 0.45, 0.28}, {0, 0, 0}, 0.0, 1.5, 0, false});
-    add({"sofa_pillow", {0.67, 0.58, 0.45}, {0, 0, 0}, 0.0, 1.5, 0, false});
-    add({"chair_frame", {0.57, 0.36, 0.18}, {0, 0, 0}, 0.02, 1.5, 0, false});
-    add({"chair_cushion", {0.63, 0.51, 0.39}, {0, 0, 0}, 0.0, 1.5, 0, false});
-    add({"ceramic", {0.82, 0.76, 0.64}, {0, 0, 0}, 0, 1.5, 0, false});
+    add({"frame", {0.62, 0.42, 0.18}, {0, 0, 0}, 0.018, 1.5, 1, false});
+    add({"brass", {0.80, 0.57, 0.22}, {0, 0, 0}, 0.075, 1.5, 1, false});
+    add({"sofa_body", {0.46, 0.29, 0.16}, {0, 0, 0}, 0.0, 1.5, 0, false, 0.028, 16.0});
+    add({"sofa_cushion", {0.62, 0.45, 0.28}, {0, 0, 0}, 0.0, 1.5, 0, false, 0.045, 14.0});
+    add({"sofa_pillow", {0.67, 0.58, 0.45}, {0, 0, 0}, 0.0, 1.5, 0, false, 0.04, 13.0});
+    add({"chair_frame", {0.57, 0.36, 0.18}, {0, 0, 0}, 0.02, 1.5, 0, false, 0.038, 44.0});
+    add({"chair_cushion", {0.63, 0.51, 0.39}, {0, 0, 0}, 0.0, 1.5, 0, false, 0.048, 15.0});
+    add({"ceramic", {0.82, 0.76, 0.64}, {0, 0, 0}, 0, 1.5, 0, false, 0.12, 96.0});
     add({"leaf", {0.10, 0.35, 0.16}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"book_red", {0.45, 0.055, 0.040}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"lamp_shade", {0.88, 0.77, 0.56}, {0, 0, 0}, 0, 1.5, 0, false});
@@ -413,21 +433,21 @@ std::vector<Material> makeMaterials(const Options &opt, std::map<std::string, in
     add({"painting_green", {0.16, 0.46, 0.40}, {0.035, 0.08, 0.06}, 0, 1.5, 0, false});
     add({"painting_orange", {0.78, 0.34, 0.12}, {0.12, 0.045, 0.015}, 0, 1.5, 0, false});
     add({"painting_red", {0.52, 0.08, 0.06}, {0.08, 0.012, 0.008}, 0, 1.5, 0, false});
-    add({"white_piece", {0.78, 0.75, 0.66}, {0, 0, 0}, 0.0, 1.5, 0, false});
+    add({"white_piece", {0.78, 0.75, 0.66}, {0, 0, 0}, 0.0, 1.5, 0, false, 0.10, 120.0});
     add({"black_piece", {0.035, 0.030, 0.026}, {0, 0, 0}, 0.0, 1.5, 0, false});
     add({"matte_black", {0.02, 0.02, 0.025}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"plaster_light", {0.72, 0.58, 0.43}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"plaster_raw", {0.36, 0.20, 0.12}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"plaster_shadow", {0.16, 0.095, 0.060}, {0, 0, 0}, 0, 1.5, 0, false});
-    add({"old_wood", {0.34, 0.16, 0.060}, {0, 0, 0}, 0.08, 1.5, 0, false});
+    add({"old_wood", {0.34, 0.16, 0.060}, {0, 0, 0}, 0.08, 1.5, 0, false, 0.045, 42.0});
     add({"old_wood_dark", {0.12, 0.060, 0.030}, {0, 0, 0}, 0, 1.5, 0, false});
-    add({"old_wood_light", {0.60, 0.30, 0.11}, {0, 0, 0}, 0.04, 1.5, 0, false});
+    add({"old_wood_light", {0.60, 0.30, 0.11}, {0, 0, 0}, 0.04, 1.5, 0, false, 0.055, 50.0});
     add({"dust", {0.18, 0.14, 0.10}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"shadow_hole", {0.018, 0.014, 0.011}, {0, 0, 0}, 0, 1.5, 0, false});
     add({"metal", {0.78, 0.78, 0.74}, {0, 0, 0}, opt.metalRoughness, 1.5, 1, false});
     add({"glass", {0.94, 0.98, 1.0}, {0, 0, 0}, 0.01, 1.52, 2, false});
-    add({"light_panel", {1, 1, 1}, {18.0, 14.0, 10.0}, 0, 1.5, 3, true});
-    add({"light_fill", {1, 1, 1}, {10.0, 8.0, 6.0}, 0, 1.5, 3, true});
+    add({"light_panel", {1, 1, 1}, {18.6, 13.7, 8.9}, 0, 1.5, 3, true});
+    add({"light_fill", {1, 1, 1}, {6.1, 6.8, 7.8}, 0, 1.5, 3, true});
     return m;
 }
 
@@ -570,6 +590,89 @@ void rebuildSmoothNormalsForObjectGroup(std::vector<Triangle> &tris,
     }
 }
 
+void softenNormalsLocallyForObjectGroup(std::vector<Triangle> &tris,
+                                        const std::vector<std::string> &objectPrefixes,
+                                        double radius,
+                                        double blend,
+                                        double minDot) {
+    if (radius <= 0.0 || blend <= 0.0) return;
+
+    auto matchesPrefix = [&](const std::string &object) {
+        for (const auto &prefix : objectPrefixes) {
+            if (object.rfind(prefix, 0) == 0) return true;
+        }
+        return false;
+    };
+
+    struct VertexEntry {
+        Vec3 position;
+        Vec3 normalSum{0.0, 0.0, 0.0};
+    };
+    using VertexKey = std::pair<std::string, int>;
+    using CellKey = std::tuple<int, int, int>;
+
+    std::map<VertexKey, VertexEntry> entries;
+    auto accumulateVertex = [&](const Triangle &tri, int vertexId, const Vec3 &position) {
+        auto &entry = entries[{tri.object, vertexId}];
+        entry.position = position;
+        entry.normalSum += tri.area * tri.normal;
+    };
+
+    for (const auto &tri : tris) {
+        if (!matchesPrefix(tri.object)) continue;
+        accumulateVertex(tri, tri.vi0, tri.v0);
+        accumulateVertex(tri, tri.vi1, tri.v1);
+        accumulateVertex(tri, tri.vi2, tri.v2);
+    }
+    if (entries.empty()) return;
+
+    std::map<CellKey, std::vector<VertexKey>> grid;
+    double invCell = 1.0 / radius;
+    auto cellFor = [&](const Vec3 &p) {
+        return CellKey{int(std::floor(p.x * invCell)), int(std::floor(p.y * invCell)), int(std::floor(p.z * invCell))};
+    };
+    for (const auto &[key, entry] : entries) {
+        grid[cellFor(entry.position)].push_back(key);
+    }
+
+    double radius2 = radius * radius;
+    std::map<VertexKey, Vec3> softened;
+    for (const auto &[key, entry] : entries) {
+        Vec3 base = length(entry.normalSum) > 0.0 ? normalize(entry.normalSum) : Vec3{0.0, 1.0, 0.0};
+        auto [cx, cy, cz] = cellFor(entry.position);
+        Vec3 localSum = entry.normalSum;
+        for (int dx = -1; dx <= 1; ++dx) {
+            for (int dy = -1; dy <= 1; ++dy) {
+                for (int dz = -1; dz <= 1; ++dz) {
+                    auto it = grid.find(CellKey{cx + dx, cy + dy, cz + dz});
+                    if (it == grid.end()) continue;
+                    for (const auto &otherKey : it->second) {
+                        if (otherKey.first != key.first || otherKey == key) continue;
+                        const auto &other = entries.at(otherKey);
+                        Vec3 delta = other.position - entry.position;
+                        double dist2 = dot(delta, delta);
+                        if (dist2 > radius2) continue;
+                        Vec3 otherBase = length(other.normalSum) > 0.0 ? normalize(other.normalSum) : base;
+                        if (dot(base, otherBase) < minDot) continue;
+                        double weight = 1.0 - std::sqrt(dist2) / radius;
+                        localSum += weight * other.normalSum;
+                    }
+                }
+            }
+        }
+        Vec3 localAvg = length(localSum) > 0.0 ? normalize(localSum) : base;
+        softened[key] = normalize((1.0 - blend) * base + blend * localAvg);
+    }
+
+    for (auto &tri : tris) {
+        if (!matchesPrefix(tri.object)) continue;
+        tri.n0 = softened[{tri.object, tri.vi0}];
+        tri.n1 = softened[{tri.object, tri.vi1}];
+        tri.n2 = softened[{tri.object, tri.vi2}];
+        tri.hasVertexNormals = true;
+    }
+}
+
 bool canRaySee(const Ray &ray, const Triangle &tri) {
     if (tri.visibility == kVisibleToAll) return true;
     if (tri.visibility == kCameraOnly) return ray.visibility == kPrimaryRay;
@@ -661,12 +764,40 @@ std::vector<Triangle> loadObj(const Options &opt, const std::map<std::string, in
         // soft sofa pieces inside the renderer.
         rebuildSmoothNormalsForMaterial(tris, it->second);
     }
-    // The three back-cushion objects are modeled as separate strips with tiny
-    // gaps, so smooth them together across nearby boundary vertices.
+    // The three sofa back-cushion objects are modeled as separate strips with
+    // tiny gaps, so smooth them together across nearby boundary vertices.
     rebuildSmoothNormalsForObjectGroup(
         tris,
         {"CameraOnlyImportedRoomFurniture_28", "CameraOnlyImportedRoomFurniture_29", "CameraOnlyImportedRoomFurniture_30"},
         0.04);
+    // Apply a gentler local soften pass to the imported chair upholstery to
+    // reduce rough side shading without forcing separate cushion pieces into a
+    // single aggressive cross-object smooth group.
+    softenNormalsLocallyForObjectGroup(
+        tris,
+        {
+            "ImportedRoomFurniture_191", "ImportedRoomFurniture_193", "ImportedRoomFurniture_194",
+            "ImportedRoomFurniture_196", "ImportedRoomFurniture_197",
+            "ReflectionOnlyImportedRoomFurniture_191", "ReflectionOnlyImportedRoomFurniture_193",
+            "ReflectionOnlyImportedRoomFurniture_194", "ReflectionOnlyImportedRoomFurniture_196",
+            "ReflectionOnlyImportedRoomFurniture_197"
+        },
+        0.008,
+        0.38,
+        0.55);
+    // Soften the visible sofa arm and seat locally to reduce tiny front-edge
+    // speckling without flattening the overall upholstery shape.
+    softenNormalsLocallyForObjectGroup(
+        tris,
+        {
+            "CameraOnlyImportedRoomFurniture_24",
+            "CameraOnlyImportedRoomFurniture_25",
+            "CameraOnlyImportedRoomFurniture_26",
+            "CameraOnlyImportedRoomFurniture_27"
+        },
+        0.004,
+        0.22,
+        0.72);
     return tris;
 }
 
@@ -852,10 +983,11 @@ struct Scene {
         return color;
     }
 
-    Vec3 sampleDirect(const Hit &hit, const Material &mat, int visibility, Rng &rng) const {
+    Vec3 sampleDirect(const Hit &hit, const Material &mat, const Ray &viewRay, Rng &rng) const {
         if (lightTris.empty() || mat.type == 2 || mat.type == 3) return {0, 0, 0};
         Vec3 result{0, 0, 0};
         Vec3 brdf = surfaceAlbedo(hit, mat) / kPi;
+        Vec3 wo = normalize(-viewRay.direction);
         for (int idx : lightTris) {
             const Triangle &lt = triangles[idx];
             double r1 = rng.next();
@@ -872,12 +1004,18 @@ struct Scene {
             bool visible = true;
             if (opt.shadows) {
                 Hit shadowHit;
-                Ray shadowRay{hit.p + 1e-4 * hit.normal, wi, visibility};
+                Ray shadowRay{hit.p + 1e-4 * hit.normal, wi, viewRay.visibility};
                 visible = !intersect(shadowRay, 1e-4, dist - 2e-4, shadowHit);
             }
             if (visible) {
                 const Material &lm = materials[lt.material];
-                result += lm.emission * brdf * (lt.area * cosSurface * cosLight / std::max(1e-8, dist2));
+                Vec3 directBrdf = brdf;
+                if (mat.type == 0 && mat.specular > 0.0) {
+                    Vec3 halfVec = normalize(wi + wo);
+                    double spec = mat.specular * std::pow(std::max(0.0, dot(hit.normal, halfVec)), mat.shininess);
+                    directBrdf += Vec3{spec, spec, spec};
+                }
+                result += lm.emission * directBrdf * (lt.area * cosSurface * cosLight / std::max(1e-8, dist2));
             }
         }
         return result;
@@ -937,7 +1075,7 @@ struct Scene {
             // Keep a small amount of direct light on the mirror for a softer, more staged look
             // without bringing back the frosted veil from full diffuse lighting.
             double directLightScale = mat.name == "mirror" ? 0.12 : 1.0;
-            radiance += throughput * (directLightScale * sampleDirect(hit, mat, ray.visibility, rng));
+            radiance += throughput * (directLightScale * sampleDirect(hit, mat, ray, rng));
             Ray scattered;
             Vec3 atten;
             if (!scatter(ray, hit, mat, rng, atten, scattered)) break;
@@ -983,7 +1121,8 @@ void writePpm(const std::string &path, const std::vector<Vec3> &pixels, int w, i
     }
     out << "P6\n" << w << " " << h << "\n255\n";
     for (const Vec3 &p : pixels) {
-        Vec3 c = clamp01({std::sqrt(std::max(0.0, p.x)), std::sqrt(std::max(0.0, p.y)), std::sqrt(std::max(0.0, p.z))});
+        Vec3 filmic = filmicTonemap(p);
+        Vec3 c{gammaEncode(filmic.x), gammaEncode(filmic.y), gammaEncode(filmic.z)};
         unsigned char rgb[3] = {
             static_cast<unsigned char>(255.999 * c.x),
             static_cast<unsigned char>(255.999 * c.y),

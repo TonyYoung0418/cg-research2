@@ -579,8 +579,8 @@ void writeMtl(const BuildOptions &opt) {
     mat("old_wood_light", {0.60, 0.30, 0.11});
     mat("dust", {0.18, 0.14, 0.10});
     mat("shadow_hole", {0.018, 0.014, 0.011});
-    mat("light_panel", {1, 1, 1}, {18.0, 14.0, 10.0});
-    mat("light_fill", {1, 1, 1}, {10.0, 8.0, 6.0});
+    mat("light_panel", {1, 1, 1}, {18.6, 13.7, 8.9});
+    mat("light_fill", {1, 1, 1}, {6.1, 6.8, 7.8});
 }
 
 } // namespace
@@ -633,7 +633,7 @@ void writeSceneObj(const BuildOptions &opt) {
     w.quad("MainLight", "light_panel", {lp.x - ls, lp.y, lp.z - 0.35 * ls}, {lp.x + ls, lp.y, lp.z - 0.35 * ls},
            {lp.x + ls, lp.y, lp.z + 0.35 * ls}, {lp.x - ls, lp.y, lp.z + 0.35 * ls});
     if (opt.extraLight) {
-        double fs = ls * 0.8;
+        double fs = ls * 0.62;
         Vec3 fp{lp.x, lp.y, -1.85};
         w.quad("FillLight", "light_fill", {fp.x - fs, fp.y, fp.z - 0.30 * fs}, {fp.x + fs, fp.y, fp.z - 0.30 * fs},
                {fp.x + fs, fp.y, fp.z + 0.30 * fs}, {fp.x - fs, fp.y, fp.z + 0.30 * fs});
